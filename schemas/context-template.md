@@ -9,6 +9,7 @@ emits: []
 consumes: []
 dependsOn: []
 providesTo: []
+# fingerprint and lastIndexed are computed by /sync-context — do not edit manually
 ---
 # <repo-name> — context
 

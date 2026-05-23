@@ -19,6 +19,7 @@
     },
     "repos": {
       "type": "array",
+      "minItems": 1,
       "description": "One entry per managed repository.",
       "items": {
         "type": "object",
@@ -36,6 +37,7 @@
           },
           "path": {
             "type": "string",
+            "pattern": "^\\./",
             "description": "Relative path from workspace root, e.g. './auth-service'."
           },
           "agentType": {
@@ -45,20 +47,24 @@
           },
           "agentFile": {
             "type": "string",
+            "pattern": "^\\.claude/agents/repo-[a-z0-9-]+\\.md$",
             "description": "Relative path to the generated agent markdown file."
           },
           "contextFile": {
             "type": "string",
+            "pattern": "^\\.repo-orchestrator/context/[a-z0-9-]+\\.md$",
             "description": "Relative path to the editable context markdown file."
           },
           "languages": {
             "type": "array",
             "items": { "type": "string" },
+            "uniqueItems": true,
             "description": "Programming languages detected in this repo."
           },
           "frameworks": {
             "type": "array",
             "items": { "type": "string" },
+            "uniqueItems": true,
             "description": "Frameworks detected, e.g. ['NestJS', 'Prisma']."
           },
           "owns": {

@@ -52,7 +52,7 @@ When the master places you in an Agent Team and you identify a cross-repo depend
 
 ## Output report (required format)
 
-Return exactly this block when your analysis is complete:
+Return exactly this block when your analysis is complete (substitute `{{NAME}}` with the actual repo name, and fill in each field):
 
 ```
 ---
@@ -77,7 +77,7 @@ VALIDATION HINTS:
 
 - **Never modify a file.** Read-only at all times.
 - **Never commit, push, open a PR, or run any destructive command.**
-- `Bash` is for read-only inspection only: `cat`, `ls`, `grep`, `git log`, `git diff`, `git show`, `find`. If in doubt, use Read/Grep/Glob instead.
+- `Bash` is for inspection commands with no tool equivalent: `ls`, `git log`, `git diff`, `git show`. Prefer `Read`/`Grep`/`Glob` for file reading — they cannot write.
 - If the master gave you a `PreToolUse` hook that blocks write-like Bash commands, do not attempt to circumvent it.
 - The output is a **plan** — the developer decides what to execute.
 
