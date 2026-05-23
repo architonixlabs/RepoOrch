@@ -62,22 +62,31 @@ export async function runTriage({ ticket, workspaceRoot, model }) {
       allowedTools: ['Read', 'Grep', 'Glob', 'Bash', 'Agent'],
       cwd,
       env: {
-        ...process.env,
         CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
       },
       plugins: [
         { type: 'local', path: PLUGIN_ROOT },
       ],
-      systemPrompt: [
-        'You are a headless triage runner for the repo-orchestrator plugin.',
-        'You will receive a single ticket. Run /triage on it and return the complete triage report.',
-        'Do not ask clarifying questions. Do not modify any files. Output the final plan and nothing else.',
-        `Workspace root: ${cwd}`,
-      ].join('\n'),
+      // Use the claude_code preset so tool guidance and safety rules are preserved.
+      // A plain string systemPrompt would lose all tool-calling context.
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        append: [
+          'You are a headless triage runner for the repo-orchestrator plugin.',
+          'You will receive a single ticket. Run /triage on it and return the complete triage report.',
+          'Do not ask clarifying questions. Do not modify any files. Output the final plan and nothing else.',
+          `Workspace root: ${cwd}`,
+        ].join('\n'),
+      },
     },
   })) {
-    if ('result' in message) {
-      plan = message.result;
+    if (message.type === 'result') {
+      if ('result' in message) {
+        plan = message.result;
+      } else {
+        throw new Error(`Agent failed (${message.subtype}): ${message.errors?.join('; ') ?? 'unknown error'}`);
+      }
       break;
     }
   }
