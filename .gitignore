@@ -1,4 +1,18 @@
 
-
 #Ignore vscode AI rules
-.github\instructions\codacy.instructions.md
+.github/instructions/codacy.instructions.md
+
+# Build outputs
+indexer/dist/
+mcp/dist/
+
+# Dependencies
+node_modules/
+indexer/node_modules/
+mcp/node_modules/
+
+# Lock files (generated — not committed for a library/plugin)
+package-lock.json
+indexer/package-lock.json
+mcp/package-lock.json
+automation/package-lock.json
