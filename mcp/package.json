@@ -1,0 +1,22 @@
+{
+  "name": "@repo-orchestrator/mcp-server",
+  "version": "0.1.0",
+  "description": "Tier-2 optional MCP server for repo-orchestrator — exposes registry as live tools",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
