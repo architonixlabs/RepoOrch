@@ -1,0 +1,10 @@
+{
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "command": "node -e \"const fs=require('fs');const p='.repo-orchestrator/registry.json';if(!fs.existsSync(p)){process.stdout.write('\\u26a0\\ufe0f  repo-orchestrator: No registry found.\\n   Run /init-context to bootstrap repo discovery and specialist agents.\\n');}\"",
+      "description": "Warn if workspace has no registry yet. Silently skipped if node is unavailable.",
+      "continueOnError": true
+    }
+  ]
+}
