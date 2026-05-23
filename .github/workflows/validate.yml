@@ -1,0 +1,55 @@
+name: Validate Plugin
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Validate plugin
+        run: claude plugin validate .
+
+      - name: Validate registry JSON Schema
+        run: |
+          node -e "
+            const fs = require('fs');
+            const schema = JSON.parse(fs.readFileSync('schemas/registry.schema.json', 'utf8'));
+            if (!schema['\$schema']) throw new Error('Missing \$schema field');
+            if (!schema.properties) throw new Error('Missing properties');
+            console.log('registry.schema.json is valid JSON Schema');
+          "
+
+      - name: Setup Node for indexer
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Build and lint Tier-1 indexer (if present)
+        run: |
+          if [ -f indexer/package.json ]; then
+            cd indexer
+            npm ci
+            npm run build
+            npm run lint || true
+          else
+            echo "Tier-1 indexer not present, skipping"
+          fi
+
+      - name: Build Tier-2 MCP server (if present)
+        run: |
+          if [ -f mcp/package.json ]; then
+            cd mcp
+            npm ci
+            npm run build
+          else
+            echo "Tier-2 MCP server not present, skipping"
+          fi

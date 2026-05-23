@@ -1,0 +1,28 @@
+{
+  "name": "repo-orchestrator",
+  "version": "0.1.0",
+  "description": "Turns a multi-repo microservice project into a coordinated AI agent team that proposes (never applies) cross-repo change plans.",
+  "author": "Architonix",
+  "keywords": ["multi-repo", "microservices", "agent-teams", "orchestration", "planning"],
+  "repository": "https://github.com/Architonix/RepoOrch",
+  "commands": [
+    "commands/init-context.md",
+    "commands/sync-context.md",
+    "commands/edit-context.md",
+    "commands/triage.md",
+    "commands/deliberate.md"
+  ],
+  "skills": [
+    "skills/repo-indexing/SKILL.md",
+    "skills/routing/SKILL.md"
+  ],
+  "agents": [
+    "agents/repo-specialist-template.md"
+  ],
+  "hooks": "hooks/hooks.json",
+  "mcp": {
+    "optional": true,
+    "entrypoint": "mcp/dist/server.js",
+    "description": "Tier 2 optional MCP server — exposes registry as live tools. Only active when built."
+  }
+}

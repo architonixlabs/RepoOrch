@@ -1,0 +1,10 @@
+{
+  "plugins": [
+    {
+      "name": "repo-orchestrator",
+      "source": "./",
+      "description": "Coordinates a multi-repo microservice project as a propose-only AI agent team.",
+      "tags": ["multi-repo", "orchestration", "agent-teams"]
+    }
+  ]
+}
