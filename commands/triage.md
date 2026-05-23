@@ -37,6 +37,26 @@ If routing returns exactly 1 candidate with high confidence (score ≥ 4 or no o
 
 ---
 
+## Step 2.5 — Pre-fetch graph summaries (reduces specialist token cost)
+
+Before spawning any agents, check each candidate repo for a pre-built knowledge graph:
+
+For each candidate, check if `.repo-orchestrator/graphs/<name>/graph.json` exists.
+
+If it does, run a targeted BFS query against it using the routing keywords extracted in Step 1:
+
+```powershell
+& $GRAPHIFY_PYTHON -m graphify query "<routing keywords joined by space>" `
+    --graph ".repo-orchestrator/graphs/<name>/graph.json" `
+    --budget 1200
+```
+
+Where `$GRAPHIFY_PYTHON` is found using the graphify detection logic from `/graph-context`. If graphify is not installed, skip this step for all repos.
+
+Collect the output per repo as `GRAPH_SUMMARY_<name>`. If the query fails or the file does not exist, set `GRAPH_SUMMARY_<name>` to `null` — the specialist will fall back to direct file reads.
+
+---
+
 ## Step 3 — Spawn Agent Team
 
 For 2–5 candidates, spawn an **Agent Team** using the candidates' `agentType` values from the registry.
@@ -44,6 +64,7 @@ For 2–5 candidates, spawn an **Agent Team** using the candidates' `agentType` 
 Set each teammate's system context to include:
 - The full ticket text
 - The registry entry for their repo (name, path, owns, endpoints, emits, consumes)
+- `GRAPH_SUMMARY_<name>` if available (pre-fetched graph query result — read this first before touching raw files)
 - Instruction to read their context file on startup
 - Instruction to perform the VERDICT step first before any deep analysis
 - Instruction to use the mailbox to deliberate with named teammates over cross-repo contracts

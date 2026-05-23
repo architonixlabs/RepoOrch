@@ -60,6 +60,23 @@ For repos where the context file is newer than `lastIndexed`:
 
 ---
 
+## Step 3c — Refresh knowledge graphs for re-indexed repos
+
+For each repo where code drift was detected (Step 3a ran), incrementally update the knowledge graph if one already exists:
+
+```powershell
+& $GRAPHIFY_PYTHON -m graphify <repoPath> `
+    --output-dir ".repo-orchestrator/graphs/<name>" `
+    --update `
+    --no-viz
+```
+
+Where `$GRAPHIFY_PYTHON` is found using the graphify detection logic from `/graph-context`. If graphify is not installed or fails, skip silently — the existing graph (if any) remains valid for unchanged files.
+
+If no graph exists yet for this repo, skip (do not do a full build here — that is `/graph-context`'s job).
+
+---
+
 ## Step 4 — Refresh agent files if needed
 
 For each re-indexed repo, compare the new `owns` and the derived agent description to the existing agent file. If materially different (owns list changed, or description would change), regenerate `.claude/agents/repo-<name>.md` from the template using the updated values.

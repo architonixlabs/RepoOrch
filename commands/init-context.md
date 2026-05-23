@@ -57,6 +57,32 @@ Apply the budget rule from that skill. Do not read every file. Extract: `languag
 
 ---
 
+## Step 2.5 — Build knowledge graphs (optional, reduces triage token cost)
+
+After indexing all repos, attempt to build a graphify knowledge graph for each repo. This is a best-effort step — if graphify is not installed or fails, continue normally. `/triage` will fall back to direct file reads.
+
+For each repo, run from the workspace root:
+
+```powershell
+New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | Out-Null
+& $GRAPHIFY_PYTHON -m graphify <repoPath> `
+    --output-dir ".repo-orchestrator/graphs/<name>" `
+    --mode deep `
+    --no-viz `
+    --directed
+```
+
+Where `$GRAPHIFY_PYTHON` is found using the same detection logic as `/graph-context`. If graphify is not installed, skip this step entirely and print:
+
+```
+ℹ️  graphify not installed — skipping knowledge graph build.
+    Run /graph-context after setup to build graphs and reduce future triage token cost.
+```
+
+If graphify is installed but fails for a specific repo, print a warning for that repo and continue.
+
+---
+
 ## Step 3 — Write context documents
 
 For each repo, create `.repo-orchestrator/context/<name>.md`:

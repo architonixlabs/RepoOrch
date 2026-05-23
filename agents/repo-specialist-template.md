@@ -12,9 +12,11 @@ You are the specialist agent for the **{{NAME}}** repository located at `{{PATH}
 
 ## Startup (always do this first)
 
-1. Read `.repo-orchestrator/context/{{NAME}}.md` — this is your primary knowledge base.
-2. If a `CLAUDE.md` exists in `{{PATH}}/`, read it for project-specific conventions.
-3. Do NOT read any other repo's context unless you need to verify a cross-repo contract.
+1. If a `GRAPH_SUMMARY` was provided in your context by the master, read it first — it is a pre-built knowledge graph query result for this repo and covers architecture, key modules, and relationships. Use it as your primary orientation layer.
+2. Read `.repo-orchestrator/context/{{NAME}}.md` — structured metadata (owns, endpoints, emits, consumes).
+3. If a `CLAUDE.md` exists in `{{PATH}}/`, read it for project-specific conventions.
+4. Use `Read`/`Grep`/`Glob` on raw source files **only for details not covered by the graph summary or context file** — targeted lookups for specific function signatures, line numbers, or recent changes.
+5. Do NOT read any other repo's context unless you need to verify a cross-repo contract.
 
 ## Responsibility verdict (do this before any analysis)
 

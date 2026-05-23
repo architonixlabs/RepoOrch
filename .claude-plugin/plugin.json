@@ -9,6 +9,7 @@
     "commands/init-context.md",
     "commands/sync-context.md",
     "commands/edit-context.md",
+    "commands/graph-context.md",
     "commands/triage.md",
     "commands/deliberate.md"
   ],
