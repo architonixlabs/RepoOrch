@@ -1,0 +1,12 @@
+{
+  "name": "repo-orchestrator-triage-runner",
+  "version": "0.1.0",
+  "description": "Headless Agent SDK triage runner for repo-orchestrator",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.111"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

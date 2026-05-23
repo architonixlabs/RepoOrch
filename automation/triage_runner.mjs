@@ -13,11 +13,11 @@
  *   import { runTriage } from './automation/triage_runner.mjs';
  *   const plan = await runTriage({ ticket: '...', workspaceRoot: '/path/to/workspace' });
  *
- * Pin the SDK version in the package.json of the caller and verify the
- * Agent constructor options against the installed @anthropic-ai/claude-code docs.
+ * SDK: @anthropic-ai/claude-agent-sdk — pin the version in your package.json.
+ * Plugin-loading option shape verified against Agent SDK docs (agent-sdk/plugins).
  */
 
-import { Agent } from '@anthropic-ai/claude-code';
+import { query } from '@anthropic-ai/claude-agent-sdk';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -27,7 +27,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PLUGIN_ROOT = resolve(__dirname, '..');
-const DEFAULT_MODEL = 'claude-opus-4-7';
+const DEFAULT_MODEL = 'claude-opus-4-5';
 
 /**
  * Run the /triage flow headlessly on a ticket string.
@@ -35,10 +35,14 @@ const DEFAULT_MODEL = 'claude-opus-4-7';
  * @param {object} opts
  * @param {string} opts.ticket - The ticket text to triage.
  * @param {string} [opts.workspaceRoot] - Workspace root. Defaults to process.cwd().
- * @param {string} [opts.model] - Claude model ID. Defaults to claude-opus-4-7.
+ * @param {string} [opts.model] - Claude model ID. Defaults to claude-opus-4-5.
  * @returns {Promise<string>} The final triage plan text.
  */
 export async function runTriage({ ticket, workspaceRoot, model }) {
+  if (!ticket || !ticket.trim()) {
+    throw new Error('runTriage: ticket must be a non-empty string.');
+  }
+
   const cwd = workspaceRoot ?? process.cwd();
   const resolvedModel = model ?? DEFAULT_MODEL;
 
@@ -49,40 +53,41 @@ export async function runTriage({ ticket, workspaceRoot, model }) {
     throw new Error(`Registry not found at ${registryPath}. Run /init-context in the workspace first.`);
   }
 
-  const agent = new Agent({
-    model: resolvedModel,
-    permissionMode: 'plan',
-    tools: ['Read', 'Grep', 'Glob', 'Bash', 'Agent'],
-    cwd,
-    env: {
-      CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-    },
-    plugins: [
-      {
-        localPath: PLUGIN_ROOT,
+  let plan = '';
+  for await (const message of query({
+    prompt: `/triage ${ticket}`,
+    options: {
+      model: resolvedModel,
+      permissionMode: 'plan',
+      allowedTools: ['Read', 'Grep', 'Glob', 'Bash', 'Agent'],
+      cwd,
+      env: {
+        ...process.env,
+        CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
       },
-    ],
-    systemPrompt: [
-      'You are a headless triage runner for the repo-orchestrator plugin.',
-      'You will receive a single ticket. Run /triage on it and return the complete triage report.',
-      'Do not ask clarifying questions. Do not modify any files. Output the final plan and nothing else.',
-      `Workspace root: ${cwd}`,
-    ].join('\n'),
-  });
-
-  const planChunks = [];
-  for await (const event of agent.stream(`/triage ${JSON.stringify(ticket)}`)) {
-    if (event.type === 'text') {
-      planChunks.push(event.text);
+      plugins: [
+        { type: 'local', path: PLUGIN_ROOT },
+      ],
+      systemPrompt: [
+        'You are a headless triage runner for the repo-orchestrator plugin.',
+        'You will receive a single ticket. Run /triage on it and return the complete triage report.',
+        'Do not ask clarifying questions. Do not modify any files. Output the final plan and nothing else.',
+        `Workspace root: ${cwd}`,
+      ].join('\n'),
+    },
+  })) {
+    if ('result' in message) {
+      plan = message.result;
+      break;
     }
   }
 
-  return planChunks.join('');
+  return plan;
 }
 
 // ── CLI entry point ──────────────────────────────────────────────────────────
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const ticket = process.argv.slice(2).join(' ');
   if (!ticket) {
     process.stderr.write('Usage: node automation/triage_runner.mjs "<ticket text>"\n');
