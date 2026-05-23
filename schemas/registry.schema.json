@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Architonix/RepoOrch/schemas/registry.schema.json",
+  "title": "RepoOrchestrator Registry",
+  "description": "Master source of truth for all managed repos and their specialist agents.",
+  "type": "object",
+  "required": ["version", "generatedAt", "repos"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version — always 1 for v1."
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO8601 timestamp of the last full generation."
+    },
+    "repos": {
+      "type": "array",
+      "description": "One entry per managed repository.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name", "path", "agentType", "agentFile", "contextFile",
+          "languages", "frameworks", "owns", "endpoints", "emits",
+          "consumes", "dependsOn", "providesTo", "fingerprint", "lastIndexed"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Short identifier — matches the directory name.",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative path from workspace root, e.g. './auth-service'."
+          },
+          "agentType": {
+            "type": "string",
+            "description": "The Claude Code agent name, e.g. 'repo-auth-service'.",
+            "pattern": "^repo-[a-z0-9-]+$"
+          },
+          "agentFile": {
+            "type": "string",
+            "description": "Relative path to the generated agent markdown file."
+          },
+          "contextFile": {
+            "type": "string",
+            "description": "Relative path to the editable context markdown file."
+          },
+          "languages": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Programming languages detected in this repo."
+          },
+          "frameworks": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Frameworks detected, e.g. ['NestJS', 'Prisma']."
+          },
+          "owns": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Routing keywords / domain areas this repo owns."
+          },
+          "endpoints": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "HTTP endpoints exposed, e.g. ['POST /login']."
+          },
+          "emits": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Events this repo emits."
+          },
+          "consumes": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Events this repo subscribes to from other services."
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Names of other repos this repo depends on."
+          },
+          "providesTo": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Names of other repos that consume this repo's APIs/events."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "SHA-256 hash of indexed inputs for drift detection.",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "lastIndexed": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO8601 timestamp of the last index run."
+          },
+          "userEdited": {
+            "type": "boolean",
+            "description": "True when a human has manually edited this entry. /sync-context will not overwrite without confirmation."
+          }
+        }
+      }
+    }
+  }
+}
