@@ -122,7 +122,10 @@ function handleUpdateRepoContext(args: unknown): string {
 function handleRegisterAgent(args: unknown): string {
   const { entry } = RegisterEntrySchema.parse(args);
   const registry = loadRegistry() as Registry;
-  const name = entry['name'] as string;
+  const name = entry['name'];
+  if (typeof name !== 'string' || name.trim() === '') {
+    throw new Error('entry.name is required and must be a non-empty string.');
+  }
   const idx = registry.repos.findIndex(r => r['name'] === name);
   if (idx >= 0) {
     registry.repos[idx] = entry as Record<string, unknown>;
@@ -141,7 +144,7 @@ function handleFindOwningRepos(args: unknown): string {
   const results = registry.repos
     .map(r => {
       let score = 0;
-      const fields = [...r.owns, ...r.endpoints, ...r.emits, ...r.consumes].map(s => s.toLowerCase());
+      const fields = [...(r.owns ?? []), ...(r.endpoints ?? []), ...(r.emits ?? []), ...(r.consumes ?? [])].map(s => s.toLowerCase());
       for (const kw of lower) {
         for (const field of fields) {
           if (field === kw) score += 3;
