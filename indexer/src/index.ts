@@ -133,7 +133,6 @@ const ENDPOINT_PATTERNS: Array<{ re: RegExp; methodGroup: number; pathGroup: num
 const METHOD_NORMALISE: Record<string, string> = {
   get: 'GET', post: 'POST', put: 'PUT', patch: 'PATCH', delete: 'DELETE', head: 'HEAD',
   getmapping: 'GET', postmapping: 'POST', putmapping: 'PUT', deletemapping: 'DELETE', patchmapping: 'PATCH',
-  httpget: 'GET', httppost: 'POST', httpput: 'PUT', httpdelete: 'DELETE', httppatch: 'PATCH',
 };
 
 function extractEndpoints(content: string): string[] {
