@@ -1,0 +1,76 @@
+# Repo Indexing Skill (Tier 0)
+
+Use this skill when you need to scan a repository and produce structured context for it. This is the fallback when the Tier-1 indexer is unavailable.
+
+## Goal
+
+Produce a filled-in context document (based on `schemas/context-template.md`) and the structured fields needed for `registry.json`:
+- `languages`, `frameworks`
+- `owns` (domain keywords)
+- `endpoints` (HTTP routes exposed)
+- `emits`, `consumes` (events)
+- `dependsOn`, `providesTo` (repo names)
+- `fingerprint` (sha256 of indexed inputs — computed as described below)
+
+## Budget rule
+
+Large repos can have hundreds of files. **Do not read every file.** Prioritise in this order:
+1. `README.md` or `README.*` — purpose, architecture overview
+2. Package/build manifest: `package.json`, `*.csproj`, `pom.xml`, `go.mod`, `pyproject.toml`, `Gemfile`, `Cargo.toml`
+3. Top-level directory listing (one level deep) — understand the module structure
+4. Entry point files: `src/main.*`, `cmd/main.*`, `app.*`, `server.*`, `index.*` (max 3 files)
+5. Route/controller/handler files: files named `*.routes.*`, `*.controller.*`, `*.handler.*`, `router.*` (max 5 files, first 100 lines each)
+6. Event definition files: files named `*.events.*`, `events.*`, `*.pubsub.*` (max 3 files)
+
+Stop reading once you have enough to fill in all frontmatter fields. Do not read test files, migration files, or lock files unless there is no other way to determine a field.
+
+## Language and framework detection
+
+- **Languages:** Determined by file extensions present. Common mappings: `.ts`/`.tsx` → TypeScript, `.js`/`.mjs` → JavaScript, `.py` → Python, `.cs` → C#, `.go` → Go, `.java` → Java, `.rb` → Ruby, `.rs` → Rust.
+- **Frameworks:** Read the manifest. For `package.json`, check `dependencies` and `devDependencies` for: `@nestjs/core` → NestJS, `express` → Express, `fastify` → Fastify, `next` → Next.js. For `pom.xml`: `spring-boot` → Spring Boot. For `*.csproj`: `Microsoft.AspNetCore` → ASP.NET Core. For `go.mod`: `gin-gonic/gin` → Gin, `labstack/echo` → Echo. For `pyproject.toml`/`requirements.txt`: `fastapi` → FastAPI, `django` → Django, `flask` → Flask.
+
+## Owns / domain keyword extraction
+
+From README and entry points, extract the primary domain responsibilities. Express as short lowercase keywords (e.g., `auth`, `jwt`, `sessions`, `oauth`, `rbac`). Aim for 3–8 keywords that a ticket author would use when describing a problem in this area.
+
+## Endpoint extraction
+
+Scan route/controller files for HTTP method + path patterns:
+- Express/Fastify: `router.get('/path'`, `app.post('/path'`
+- NestJS: `@Get('/path')`, `@Post('/path')`
+- ASP.NET: `[HttpGet("path")]`, `[Route("path")]`
+- Spring Boot: `@GetMapping("/path")`, `@PostMapping`
+- FastAPI: `@app.get("/path")`, `@router.post`
+- Gin: `r.GET("/path"`, `r.POST`
+
+Format each as `METHOD /path`, e.g. `POST /login`.
+
+## Event extraction
+
+Look for publish/emit calls and subscribe/consume registrations:
+- Node.js: `emit('event.name'`, `publish('event.name'`, `subscribe('event.name'`
+- NestJS EventEmitter: `@OnEvent('event.name')`, `this.eventEmitter.emit('event.name'`
+- Message brokers: `channel.publish(`, `consumer.subscribe(`, `producer.send(`
+- Look for string constants named `*_EVENT`, `EVENT_*`, or files like `events.ts`/`events.py`
+
+Classify each as `emits` (this repo publishes) or `consumes` (this repo subscribes/handles).
+
+## Dependency graph
+
+From the manifest's `dependencies` / `imports`, identify names that match other repos in this workspace. Cross-reference with the `registry.json` repo names list if available. Fill `dependsOn` (repos this one calls) and `providesTo` (repos that call this one — infer from the others' `dependsOn`).
+
+## Fingerprint calculation
+
+The fingerprint is a SHA-256 hash used for drift detection. Compute it as:
+1. Get the git HEAD commit SHA: run `git rev-parse HEAD` in the repo directory
+2. Get the total file count: run `git ls-files | wc -l` in the repo directory
+3. Get the manifest modification timestamp from the file system
+4. Concatenate: `<HEAD_SHA>:<fileCount>:<manifestMtime>`
+5. Produce the SHA-256 of that string
+6. Format as `sha256:<hex64>`
+
+If git is unavailable (not a git repo), use the manifest content hash instead.
+
+## Output
+
+Produce the filled-in content for `.repo-orchestrator/context/<name>.md` using the template from `schemas/context-template.md`. Populate all frontmatter fields. Write a short but accurate prose section for each heading. Do not leave any section empty — write "None identified." if genuinely nothing was found.
