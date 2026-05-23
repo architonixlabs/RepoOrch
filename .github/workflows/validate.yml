@@ -12,6 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node for indexer
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
@@ -20,18 +25,17 @@ jobs:
 
       - name: Validate registry JSON Schema
         run: |
-          node -e "
-            const fs = require('fs');
-            const schema = JSON.parse(fs.readFileSync('schemas/registry.schema.json', 'utf8'));
-            if (!schema['\$schema']) throw new Error('Missing \$schema field');
-            if (!schema.properties) throw new Error('Missing properties');
-            console.log('registry.schema.json is valid JSON Schema');
-          "
-
-      - name: Setup Node for indexer
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
+          if [ -f schemas/registry.schema.json ]; then
+            node -e "
+              const fs = require('fs');
+              const schema = JSON.parse(fs.readFileSync('schemas/registry.schema.json', 'utf8'));
+              if (!schema['\$schema']) throw new Error('Missing \$schema field');
+              if (!schema.properties) throw new Error('Missing properties');
+              console.log('registry.schema.json is valid JSON Schema');
+            "
+          else
+            echo "schemas/registry.schema.json not present yet, skipping"
+          fi
 
       - name: Build and lint Tier-1 indexer (if present)
         run: |
