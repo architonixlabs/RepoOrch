@@ -20,7 +20,7 @@ Graphs are stored in `.repo-orchestrator/graphs/<name>/` and consumed automatica
 ## Step 1 — Check registry
 
 Read `.repo-orchestrator/registry.json`. If it does not exist, stop:
-"Registry not found. Run `/init-context` first."
+"Registry not found. Run `/repo-orch-init` first."
 
 If a repo name was provided, find that entry. If not found, stop:
 "Repo `<name>` not found in registry. Available: see names in registry."
@@ -136,6 +136,6 @@ If graphify fails for a repo, print a warning and continue with the rest — do 
   auth-service  → .repo-orchestrator/graphs/auth-service/graph.json  (42 nodes, 67 edges)
   payments      → .repo-orchestrator/graphs/payments/graph.json       (31 nodes, 48 edges)
 
-/triage will now use these graphs to pre-populate specialist context.
+/repo-orch-triage will now use these graphs to pre-populate specialist context.
 Run /repo-orch-graph --rebuild to force a full rebuild after major refactors.
 ```

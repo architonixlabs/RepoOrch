@@ -33,8 +33,9 @@ For each repo to process:
 **Decision:**
 
 - If fingerprint unchanged AND context file not modified: repo is up to date — skip and report "No drift detected."
-- If fingerprint changed: code has changed — re-index (Step 3a).
-- If context file is newer than `lastIndexed`: user made manual edits — ingest frontmatter (Step 3b).
+- If fingerprint changed AND context file is NOT newer than `lastIndexed`: code has changed — re-index (Step 3a only).
+- If context file is newer than `lastIndexed` AND fingerprint is unchanged: user made manual edits — ingest frontmatter (Step 3b only).
+- If **both** fingerprint changed AND context file is newer than `lastIndexed`: run Step 3a to re-index, then immediately run Step 3b to merge the user's manual edits on top of the re-indexed values. Set `userEdited: true` in the registry entry regardless of the outcome — the user has made intentional edits that must survive future syncs.
 
 ---
 
@@ -67,16 +68,16 @@ For repos where the context file is newer than `lastIndexed`:
 
 ## Step 3c — Refresh knowledge graphs for re-indexed repos
 
-For each repo where code drift was detected (Step 3a ran), incrementally update the knowledge graph if one already exists:
+For each repo where code drift was detected (Step 3a ran), incrementally update the knowledge graph if one already exists.
+
+First, run the graphify detection script from Step 2 of `/repo-orch-graph` to establish `$GRAPHIFY_PYTHON`. Then:
 
 ```powershell
 & $GRAPHIFY_PYTHON -m graphify <repoPath> `
     --output-dir ".repo-orchestrator/graphs/<name>" `
     --update `
     --no-viz
-```
-
-Where `$GRAPHIFY_PYTHON` is found using the graphify detection logic from `/repo-orch-graph`. If graphify is not installed or fails, skip silently — the existing graph (if any) remains valid for unchanged files.
+``` If graphify is not installed or fails, skip silently — the existing graph (if any) remains valid for unchanged files.
 
 If no graph exists yet for this repo, skip (full builds are `/repo-orch-graph`'s job).
 

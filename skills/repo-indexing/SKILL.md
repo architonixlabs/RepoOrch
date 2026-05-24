@@ -93,7 +93,9 @@ From the manifest's `dependencies` / `imports`, identify names that match other 
 
 The fingerprint is a SHA-256 hash used for drift detection. Compute it as:
 1. Get the git HEAD commit SHA: run `git rev-parse HEAD` in the repo directory
-2. Get the total file count: run `git ls-files | wc -l` in the repo directory
+2. Get the total tracked file count — use the platform-appropriate form:
+   - Bash (Linux/macOS/CI): `git ls-files | wc -l`
+   - PowerShell (Windows): `(git ls-files | Measure-Object -Line).Lines`
 3. Get the manifest modification timestamp from the file system
 4. Concatenate: `<HEAD_SHA>:<fileCount>:<manifestMtime>`
 5. Produce the SHA-256 of that string

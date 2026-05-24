@@ -59,7 +59,8 @@ Spawn all registered repo specialists as an Agent Team. Pass to each:
   > 1. Read every other specialist's initial verdict and reasoning.
   > 2. For each RESPONSIBLE or PARTIALLY_RESPONSIBLE verdict from another specialist: assess whether their proposed root cause is consistent with the shared contracts between your service and theirs.
   > 3. Send at least one mailbox challenge if you believe another specialist's hypothesis contradicts a contract you own — cite the specific contract (endpoint, event name, error code, JWT claim, env var) and the file+line that proves the inconsistency.
-  > 4. If another specialist sends you a challenge, respond with evidence — a file path and line number — not assertions."
+  > 4. If another specialist sends you a challenge, respond with evidence — a file path and line number — not assertions.
+  > 5. **Even if you emit NOT_RESPONSIBLE for your own repo**, you must still act as a skeptic. Read every other specialist's hypothesis and challenge any that contradict a contract your service owns. Your value in this team is not only your own verdict — it is the cross-repo contract knowledge you hold. A hypothesis that passes unchallenged because you stayed silent is a missed root cause."
 
 - Hard rule: propose only, never modify files
 - Enable `permissionMode: "plan"`

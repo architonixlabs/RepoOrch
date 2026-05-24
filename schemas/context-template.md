@@ -49,7 +49,10 @@ testContracts:
   integrationSuite: "" # e.g. "npm run test:integration in auth-service"
   contractTests: []    # e.g. ["pact/auth-payments.json"] — Pact or CDC test files
   e2eScenarios: []     # e.g. ["checkout happy path", "401 on expired token"]
-# fingerprint and lastIndexed are managed by /repo-orch-sync — do not edit manually
+# The fields below are managed automatically — do not edit manually
+# fingerprint: ""     # sha256:<hex64> — recomputed by /repo-orch-sync on each index run
+# lastIndexed: ""     # ISO8601 timestamp — updated by /repo-orch-sync and /repo-orch-init
+# userEdited: false   # set to true by /repo-orch-edit when you save manual changes
 ---
 
 # `<repo-name>` — context

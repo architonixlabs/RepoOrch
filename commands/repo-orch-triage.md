@@ -31,20 +31,34 @@ If 0 candidates: stop and report "No responsible repo identified. Review the `ow
 
 ---
 
-## Step 2 — Single-repo shortcut
+## Step 2 — Pre-fetch graph summaries (all paths)
+
+Before making the single-repo vs. team decision, check every candidate for a pre-built knowledge graph. This step runs for both the single-repo shortcut and the Agent Team path.
+
+For each candidate where `.repo-orchestrator/graphs/<name>/graph.json` exists, run the graphify detection script from Step 2 of `/repo-orch-graph` to obtain `$GRAPHIFY_PYTHON`, then query:
+
+```powershell
+& $GRAPHIFY_PYTHON -m graphify query "<routing keywords joined by space>" `
+    --graph ".repo-orchestrator/graphs/<name>/graph.json" `
+    --budget 1200
+```
+
+If graphify is not installed or the query fails for a repo, set `GRAPH_SUMMARY_<name>` to `null` — the specialist falls back to direct file reads. Do not abort the triage.
+
+---
+
+## Step 3 — Single-repo shortcut
 
 If the routing skill returns exactly 1 candidate **or** the top candidate's `routingConfidence` ≥ 80% with a score gap ≥ 4 from the second:
 
 - Skip the Agent Team entirely
 - Spawn a single subagent using the candidate's `agentType`
-- Pass the full ticket text and the ROUTING CONTEXT block
+- Pass the full ticket text, the ROUTING CONTEXT block, the candidate's full registry entry (all fields — the specialist needs `authContracts`, `errorContracts`, `dataContracts`, etc. for contract analysis), and `GRAPH_SUMMARY_<name>` if available
 - Jump to Step 5 when the report arrives
 
 ---
 
-## Step 2.5 — Pre-fetch graph summaries
-
-Before spawning agents, check each candidate for a pre-built knowledge graph.
+## Step 3.5 — Spawn Agent Team (2–5 candidates)
 
 For each candidate where `.repo-orchestrator/graphs/<name>/graph.json` exists:
 
@@ -58,15 +72,14 @@ Use the graphify detection logic from `/repo-orch-graph`. If graphify is not ins
 
 ---
 
-## Step 3 — Spawn Agent Team
-
 For 2–5 candidates, spawn an **Agent Team** using the candidates' `agentType` values from the registry.
 
 Pass to each specialist in their system context:
+
 - Full ticket text
 - Registry entry for their repo (all fields — specialists use `authContracts`, `errorContracts`, `dataContracts`, etc. for contract analysis)
-- `GRAPH_SUMMARY_<name>` if available
-- The full ROUTING CONTEXT block (keywords, routing confidence, their score, reason selected, other candidates)
+- `GRAPH_SUMMARY_<name>` if available (pre-fetched in Step 2)
+- The full ROUTING CONTEXT block (keywords, routing confidence, their score, reason selected, other candidates with agent names)
 - Instruction: read startup sequence in order (graph summary → context file → per-repo skill → CLAUDE.md → selective source reads)
 - Instruction: emit VERDICT first before any deep analysis
 - Instruction: deliberate with named teammates over cross-repo contracts via the mailbox (max 2 rounds per pair)

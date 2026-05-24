@@ -118,7 +118,7 @@ For each repo, compute a raw match score. Score every token (original + expansio
 - 3-keyword repo → divides by 2
 - 6-keyword repo → divides by 5
 
-This ensures a single exact `owns` match always beats a partial match on a keyword-rich repo.
+This ensures a single exact `owns` match always beats additional `owns` partial matches on a keyword-rich repo. Note: non-`owns` signals (endpoints +4, explicit name +5, error codes +4) are added to the normalized `owns` score and can still push a keyword-rich repo ahead — this is intentional, since a direct endpoint match is stronger evidence than keyword overlap.
 
 ---
 
@@ -153,9 +153,9 @@ Routing confidence: <N>%
 Your routing score: <N> (raw=<N>, normalized=<N.N>)
 Reason you were selected: <matched owns / endpoints / events / name listed>
 
-Teammates in this triage (use agent name as the mailbox address):
-  <repo2>  agent: repo-<repo2>  score=<N>  reason="..."
-  <repo3>  agent: repo-<repo3>  score=<N>  reason="..."
+Teammates in this triage (agent name first — use it as the mailbox address):
+  agent: repo-<repo2>  name: <repo2>  score=<N>  reason="..."
+  agent: repo-<repo3>  name: <repo3>  score=<N>  reason="..."
 ```
 
 **Mailbox addressing rule:** When sending deliberation messages, use the agent name (the `repo-<name>` form, e.g., `repo-payments`) as the mailbox address — not the human-readable repo name. The agent name is listed in the "agent:" column above.
@@ -191,4 +191,4 @@ Action: <"Spawn Agent Team with candidates 1–N" | "Single subagent: <repo-name
 - **Registry missing:** Stop: "Registry not found. Run `/repo-orch-init` first."
 - **All repos tie:** Prefer repos whose `owns` contains the most specific (rarest / shortest) keyword match.
 - **No `owns` keywords set:** Warn: "`<repo>` has an empty `owns` field — routing will miss it. Run `/repo-orch-edit <repo>` to add domain keywords."
-- **Ticket is very short (< 5 tokens after normalization):** Ask the user for more context before routing: "The ticket text is too brief to route confidently. What service, endpoint, or user action is affected?"
+- **Ticket is very short (< 5 tokens after normalization):** In interactive mode, ask for more context before routing: "The ticket text is too brief to route confidently. What service, endpoint, or user action is affected?" In headless/programmatic mode (system prompt contains "Do not ask clarifying questions"), skip this check and proceed with best-effort routing using the available tokens — flag low confidence in the ROUTING DECISION output instead.

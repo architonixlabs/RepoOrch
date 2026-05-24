@@ -4,7 +4,7 @@
 
 [![Validate Plugin](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.6-blue.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.2.7-blue.svg)](.claude-plugin/plugin.json)
 
 ---
 
@@ -332,6 +332,20 @@ your-workspace/
 ---
 
 ## Changelog
+
+### v0.2.7
+
+- **Critical bug fix: graph summaries skipped on single-repo fast path** — triage Step 2.5 now runs before the single-repo/team decision, so both paths get pre-fetched graph context; previously the fast path always fell back to direct file reads
+- **Runner hang fix: timeout + headless no-clarify** — `runTriage` and `runDeliberate` now have configurable timeouts (5 min / 10 min defaults); routing skill short-ticket clarification check is skipped in headless mode; system prompt adds explicit "do not ask clarifying questions" guard
+- **Sync race condition fixed** — when both fingerprint and context file are newer than `lastIndexed`, sync now runs re-index (3a) then merges user edits on top (3b), and sets `userEdited: true`; previously only one branch ran and user edits could be silently lost
+- **Fingerprint cross-platform** — `wc -l` replaced with PowerShell equivalent `Measure-Object -Line` for Windows; Bash form documented for Linux/macOS/CI
+- **Single-repo shortcut now passes registry entry** — the fast path was missing the full registry entry (including `authContracts`, `errorContracts`, etc.) in the specialist context; now passes all fields same as the Agent Team path
+- **Deliberate NOT_RESPONSIBLE specialists are now active** — adversarial instruction now explicitly requires NOT_RESPONSIBLE specialists to still challenge other hypotheses using the contract knowledge they hold; they are no longer silent after their own verdict
+- **Context template fingerprint/lastIndexed fields** — added as commented-out fields in YAML frontmatter so sync can find and update them; previously no-ops because the fields didn't exist in the file
+- **`$GRAPHIFY_PYTHON` reference made explicit** — init Step 2.5 and sync Step 3c now say to run the detection script from `/repo-orch-graph` Step 2 first; was undefined variable before
+- **Routing context teammate ordering** — agent name now appears first in teammate line (`agent: repo-<name>  name: <name>`) so LLMs grab the correct mailbox address as the first token
+- **Stale `/init-context` reference fixed in `/repo-orch-graph`** — error message and report now use correct `/repo-orch-init` and `/repo-orch-triage` command names
+- **Scoring prose accuracy** — normalization guarantee scoped correctly: applies to `owns`-sourced sub-score only; non-`owns` signals (endpoints, name, error codes) intentionally bypass normalization
 
 ### v0.2.6
 

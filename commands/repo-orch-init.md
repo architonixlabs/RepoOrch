@@ -61,6 +61,8 @@ Apply the budget rule from that skill. Do not read every file. Extract: `languag
 
 After indexing all repos, attempt to build a graphify knowledge graph for each repo. Best-effort — if graphify is not installed or fails, continue normally.
 
+First, run the graphify detection script from Step 2 of `/repo-orch-graph` to establish `$GRAPHIFY_PYTHON`. If graphify is not installed or the detection returns null, skip to the "not installed" message below. Otherwise, for each repo:
+
 ```powershell
 New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | Out-Null
 & $GRAPHIFY_PYTHON -m graphify <repoPath> `
@@ -70,7 +72,7 @@ New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | O
     --directed
 ```
 
-Use the detection logic from `/repo-orch-graph` to find `$GRAPHIFY_PYTHON`. If not installed, print:
+If graphify is not installed or detection fails, print:
 
 ```text
 graphify not installed — skipping knowledge graph build.
