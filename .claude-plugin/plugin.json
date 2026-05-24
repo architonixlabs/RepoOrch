@@ -6,13 +6,13 @@
   "keywords": ["multi-repo", "microservices", "agent-teams", "orchestration", "planning"],
   "repository": "https://github.com/architonixlabs/RepoOrch",
   "commands": [
-    "commands/setup.md",
-    "commands/init-context.md",
-    "commands/sync-context.md",
-    "commands/edit-context.md",
-    "commands/graph-context.md",
-    "commands/triage.md",
-    "commands/deliberate.md"
+    "commands/repo-orch-setup.md",
+    "commands/repo-orch-init.md",
+    "commands/repo-orch-sync.md",
+    "commands/repo-orch-edit.md",
+    "commands/repo-orch-graph.md",
+    "commands/repo-orch-triage.md",
+    "commands/repo-orch-deliberate.md"
   ],
   "skills": [
     "skills/repo-indexing/SKILL.md",

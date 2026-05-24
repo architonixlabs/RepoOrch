@@ -1,9 +1,9 @@
 ---
-name: init-context
+name: repo-orch-init
 description: "Bootstrap: discover all repos in the workspace, index them, generate editable context docs and specialist agents, and register them with the master. Pauses for user review before writing agents."
 ---
 
-# /init-context
+# /repo-orch-init
 
 Bootstrap the repo-orchestrator for your workspace. Run this once from your workspace root (the directory that contains your service repos as immediate subdirectories).
 
@@ -59,7 +59,7 @@ Apply the budget rule from that skill. Do not read every file. Extract: `languag
 
 ## Step 2.5 — Build knowledge graphs (optional, reduces triage token cost)
 
-After indexing all repos, attempt to build a graphify knowledge graph for each repo. This is a best-effort step — if graphify is not installed or fails, continue normally. `/triage` will fall back to direct file reads.
+After indexing all repos, attempt to build a graphify knowledge graph for each repo. This is a best-effort step — if graphify is not installed or fails, continue normally. `/repo-orch-triage` will fall back to direct file reads.
 
 For each repo, run from the workspace root:
 
@@ -72,11 +72,11 @@ New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | O
     --directed
 ```
 
-Where `$GRAPHIFY_PYTHON` is found using the same detection logic as `/graph-context`. If graphify is not installed, skip this step entirely and print:
+Where `$GRAPHIFY_PYTHON` is found using the same detection logic as `/repo-orch-graph`. If graphify is not installed, skip this step entirely and print:
 
-```
+```text
 ℹ️  graphify not installed — skipping knowledge graph build.
-    Run /graph-context after setup to build graphs and reduce future triage token cost.
+    Run /repo-orch-graph after setup to build graphs and reduce future triage token cost.
 ```
 
 If graphify is installed but fails for a specific repo, print a warning for that repo and continue.
@@ -99,7 +99,7 @@ Do NOT create `.claude/agents/` files yet. Do NOT update `registry.json` yet.
 
 After writing all context files, output this message and **stop**. Do not proceed until the user responds.
 
-```
+```text
 ✅ Context files written for N repo(s):
 
   • auth-service    → .repo-orchestrator/context/auth-service.md
@@ -112,7 +112,7 @@ After writing all context files, output this message and **stop**. Do not procee
    - The `endpoints`, `emits`, `consumes` fields (cross-repo contracts)
    - The prose sections (your specialist agents will read these)
 
-   To open a context file: use your editor or run `/edit-context <name>`.
+   To open a context file: use your editor or run `/repo-orch-edit <name>`.
 
 When you are happy with the context files, reply "done" or "register" to generate the specialist agents and update the registry.
 ```
@@ -164,7 +164,7 @@ If the file exists, check if `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is already s
 
 Output a summary:
 
-```
+```text
 🎉 Master now knows N repo agent(s):
 
   repo-auth-service    → .claude/agents/repo-auth-service.md
@@ -174,5 +174,5 @@ Output a summary:
 Registry updated: .repo-orchestrator/registry.json
 
 ⚠️  Please restart your Claude Code session so the newly written project agents are loaded.
-    Then use /triage <ticket> to route work to the appropriate specialists.
+    Then use /repo-orch-triage <ticket> to route work to the appropriate specialists.
 ```

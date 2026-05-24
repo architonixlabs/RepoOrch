@@ -1,13 +1,13 @@
 ---
-name: triage
+name: repo-orch-triage
 description: "Master controller: route a ticket to responsible repo specialists, have them deliberate, and return a single consolidated change plan. Propose-only — no files are modified."
 ---
 
-# /triage <ticket>
+# /repo-orch-triage
 
 Route a ticket or feature request to the responsible repo specialists and synthesise a consolidated change plan.
 
-Usage: `/triage "Users are getting 401 errors after the recent auth refactor"`
+Usage: `/repo-orch-triage "Users are getting 401 errors after the recent auth refactor"`
 
 **This command proposes only. No files are modified, no commits are made.**
 
@@ -17,13 +17,13 @@ Requires: Claude Code v2.1.32+ and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
 
 ## Step 1 — Load registry and route
 
-Read `.repo-orchestrator/registry.json`. If not found, stop: "Registry not found. Run `/init-context` first."
+Read `.repo-orchestrator/registry.json`. If not found, stop: "Registry not found. Run `/repo-orch-init` first."
 
 Use the `routing` skill (`skills/routing/SKILL.md`) to select candidate repos. Cap at 5.
 
 Print the routing decision (keywords extracted, candidates with scores).
 
-If 0 candidates: stop and report "No responsible repo identified. Review the `owns` fields in `.repo-orchestrator/registry.json` or run `/sync-context`."
+If 0 candidates: stop and report "No responsible repo identified. Review the `owns` fields in `.repo-orchestrator/registry.json` or run `/repo-orch-sync`."
 
 ---
 
@@ -51,7 +51,7 @@ If it does, run a targeted BFS query against it using the routing keywords extra
     --budget 1200
 ```
 
-Where `$GRAPHIFY_PYTHON` is found using the graphify detection logic from `/graph-context`. If graphify is not installed, skip this step for all repos.
+Where `$GRAPHIFY_PYTHON` is found using the graphify detection logic from `/repo-orch-graph`. If graphify is not installed, skip this step for all repos.
 
 Collect the output per repo as `GRAPH_SUMMARY_<name>`. If the query fails or the file does not exist, set `GRAPH_SUMMARY_<name>` to `null` — the specialist will fall back to direct file reads.
 
@@ -90,7 +90,7 @@ Each specialist should acknowledge the other's concerns before finalising their 
 
 After all specialists have returned their report blocks, synthesise a single consolidated plan for the developer:
 
-```
+```text
 ═══════════════════════════════════════════════════════════════
 TRIAGE REPORT — <ticket summary>
 Generated: <ISO8601 timestamp>

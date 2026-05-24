@@ -1,11 +1,11 @@
 ---
-name: setup
-description: "Interactive installer: checks all prerequisites (Claude Code version, Node.js, Python, graphify), offers to install missing ones, then runs /init-context to bootstrap the workspace."
+name: repo-orch-setup
+description: "Interactive installer: checks all prerequisites (Claude Code version, Node.js, Python, graphify), offers to install missing ones, then runs /repo-orch-init to bootstrap the workspace."
 ---
 
-# /setup
+# /repo-orch-setup
 
-Interactive first-time setup for repo-orchestrator. Run this once from your workspace root instead of running `/init-context` directly. It checks every prerequisite, tells you what is missing, offers to fix it, and only proceeds when the environment is ready.
+Interactive first-time setup for repo-orchestrator. Run this once from your workspace root instead of running `/repo-orch-init` directly. It checks every prerequisite, tells you what is missing, offers to fix it, and only proceeds when the environment is ready.
 
 ---
 
@@ -13,16 +13,16 @@ Interactive first-time setup for repo-orchestrator. Run this once from your work
 
 Print this banner:
 
-```
+```text
 ╔══════════════════════════════════════════════════════════╗
-║           repo-orchestrator  v0.2.0  — Setup            ║
+║        repo-orchestrator  v0.2.1  — Setup               ║
 ║     Interactive installer & prerequisite checker         ║
 ╚══════════════════════════════════════════════════════════╝
 
 This wizard will:
   1. Check all prerequisites
   2. Offer to install anything that is missing
-  3. Bootstrap your workspace with /init-context
+  3. Bootstrap your workspace with /repo-orch-init
 
 Press Enter / reply "go" to begin, or "quit" to exit.
 ```
@@ -35,7 +35,7 @@ Wait for the user to reply before continuing.
 
 Run each check below using Bash (inspection only). Print results as you go using the format:
 
-```
+```text
 [✓] Requirement name — details
 [✗] Requirement name — what is missing
 [~] Requirement name — optional, not installed
@@ -110,7 +110,7 @@ python3 -c "import graphify; print(graphify.__version__)" 2>/dev/null \
 Also try: `python3 -m graphify --version 2>/dev/null || echo "NOT_FOUND"`
 
 - If found: `[✓] graphify v<version> — knowledge graphs available`
-- If not found and Python is present: `[~] graphify — not installed (optional, saves tokens on /triage)`
+- If not found and Python is present: `[~] graphify — not installed (optional, saves tokens on /repo-orch-triage)`
 - If Python absent: `[~] graphify — skipped (Python not available)`
 
 ### Check 7 — uv (optional installer)
@@ -136,7 +136,7 @@ List immediate subdirectories of the current directory. Count how many contain a
 
 After all checks, print a categorized summary:
 
-```
+```text
 ─────────────────────────────────────────
   REQUIRED (must fix before continuing)
 ─────────────────────────────────────────
@@ -154,25 +154,30 @@ After all checks, print a categorized summary:
 Do NOT proceed to Phase 4. Instead, for each failure offer a specific fix:
 
 ### Workspace layout failure
-```
-⚠️  No git repos found. Please cd into your workspace root (the directory that 
-    contains all your service repos) and run /setup again.
-    
+
+```text
+⚠️  No git repos found. Please cd into your workspace root (the directory that
+    contains all your service repos) and run /repo-orch-setup again.
+
     Example:
       cd ~/my-project    ← contains auth-service/, payments/, etc.
-      /setup
+      /repo-orch-setup
 ```
+
 Stop here and wait for the user.
 
 ### Claude Code version failure
-```
+
+```text
 ⚠️  Please upgrade Claude Code:
       npm update -g @anthropic-ai/claude-code
-    Then restart this session and run /setup again.
+    Then restart this session and run /repo-orch-setup again.
 ```
+
 Stop here and wait for the user.
 
 ### Node.js failure (if Tier-1 features were requested)
+
 Only block if the user explicitly needs Tier-1/2 features. Tier-0 (prompt-only) works without Node.js — offer to continue with Tier-0 only.
 
 ---
@@ -181,11 +186,11 @@ Only block if the user explicitly needs Tier-1/2 features. Tier-0 (prompt-only) 
 
 For each `[~]` item, ask the user if they want it installed. Ask all optional questions in one grouped message — do not ask one at a time.
 
-```
+```text
 Optional enhancements available:
 
   A) Agent Teams (.claude/settings.json)  — enables multi-repo deliberation  [recommended]
-  B) graphify                             — reduces /triage token cost        [recommended if Python present]
+  B) graphify                             — reduces /repo-orch-triage cost    [recommended if Python present]
   C) Tier-1 indexer (npm run build)       — faster, deterministic indexing    [optional, needs Node.js]
   D) Tier-2 MCP server (npm run build)    — live registry tools               [optional, needs Node.js]
 
@@ -197,6 +202,7 @@ Wait for the user's reply.
 ### If A — Agent Teams
 
 Check if `.claude/settings.json` exists:
+
 - If it exists, read it and add `"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` to the `env` block (merge carefully — do not overwrite existing keys).
 - If it does not exist, create it:
 
@@ -223,15 +229,17 @@ Detect the best installer:
 4. Else: print install instructions and skip
 
 Run the detected command via Bash. If it succeeds:
-```
-[✓] graphify installed — run /graph-context after setup to build knowledge graphs
+
+```text
+[✓] graphify installed — run /repo-orch-graph after setup to build knowledge graphs
 ```
 
 If it fails, print the raw error and say:
-```
+
+```text
 [✗] graphify install failed. You can try manually:
       pip install graphifyy
-    Then run /graph-context once you're set up.
+    Then run /repo-orch-graph once you're set up.
 ```
 
 ### If C — Build Tier-1 indexer
@@ -240,7 +248,8 @@ If it fails, print the raw error and say:
 cd indexer && npm install && npm run build && cd ..
 ```
 
-If it succeeds: `[✓] Tier-1 indexer built — /init-context will use it automatically`  
+If it succeeds: `[✓] Tier-1 indexer built — /repo-orch-init will use it automatically`
+
 If it fails: print the error and note that Tier-0 fallback will be used.
 
 ### If D — Build Tier-2 MCP server
@@ -250,7 +259,8 @@ cd mcp && npm install && npm run build && cd ..
 ```
 
 If it succeeds:
-```
+
+```text
 [✓] Tier-2 MCP server built
 
     To activate it, add this to your workspace .claude/settings.json:
@@ -271,7 +281,7 @@ If it fails: print the error and note that Tier-0 + Tier-1 still work.
 
 Print a final readiness summary before proceeding to bootstrap:
 
-```
+```text
 ─────────────────────────────────────────
   READY TO BOOTSTRAP
 ─────────────────────────────────────────
@@ -283,24 +293,26 @@ Print a final readiness summary before proceeding to bootstrap:
   Tier-1 indexer: <built / not built — Tier-0 fallback>
   Tier-2 MCP:     <built / not built>
 
-  Next: /init-context will discover your repos, index them,
+  Next: /repo-orch-init will discover your repos, index them,
   write editable context files, and pause for your review
   before generating specialist agents.
 
   Ready to continue? [y/N]
 ```
 
-Wait for the user's reply. If "y" / "yes" / "go" / affirmative → proceed to Phase 6.  
-If "n" / "no" / "quit" → print "Setup paused. Run /setup again when ready." and stop.
+Wait for the user's reply. If "y" / "yes" / "go" / affirmative → proceed to Phase 6.
+
+If "n" / "no" / "quit" → print "Setup paused. Run /repo-orch-setup again when ready." and stop.
 
 ---
 
-## Phase 6 — Run /init-context
+## Phase 6 — Run /repo-orch-init
 
-Invoke the `/init-context` command directly (do not spawn a subagent — execute it inline as part of this session). It will handle all remaining steps: repo discovery, indexing, graphify graph building (if available), context document review, and agent registration.
+Invoke the `/repo-orch-init` command directly (do not spawn a subagent — execute it inline as part of this session). It will handle all remaining steps: repo discovery, indexing, graphify graph building (if available), context document review, and agent registration.
 
 Before invoking, print:
-```
-▶ Starting /init-context...
-──────────────────────────
+
+```text
+▶ Starting /repo-orch-init...
+──────────────────────────────
 ```

@@ -1,13 +1,13 @@
 ---
-name: edit-context
+name: repo-orch-edit
 description: "Open and guide editing of a repo's context file. Ingests frontmatter changes back into registry.json on completion."
 ---
 
-# /edit-context <repo>
+# /repo-orch-edit &lt;repo&gt;
 
 Open and guide editing of a specific repo's context document.
 
-Usage: `/edit-context auth-service`
+Usage: `/repo-orch-edit auth-service`
 
 ---
 

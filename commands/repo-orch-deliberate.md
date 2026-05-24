@@ -1,13 +1,13 @@
 ---
-name: deliberate
+name: repo-orch-deliberate
 description: "Adversarial multi-repo root-cause mode: spawn all repo specialists as an Agent Team, force them to challenge each other's assumptions, and surface the true cross-repo root cause of an incident."
 ---
 
-# /deliberate <incident>
+# /repo-orch-deliberate
 
 Run an adversarial multi-repo root-cause analysis. Use this when the cause of an incident is unclear and you need the specialists to challenge each other.
 
-Usage: `/deliberate "Payments are failing intermittently — unknown root cause"`
+Usage: `/repo-orch-deliberate "Payments are failing intermittently — unknown root cause"`
 
 **This command proposes only. No files are modified.**
 
@@ -15,11 +15,11 @@ Requires: Claude Code v2.1.32+ and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
 
 ---
 
-## Difference from `/triage`
+## Difference from `/repo-orch-triage`
 
-`/triage` routes to likely-responsible repos and has them deliberate over cross-repo contracts.
+`/repo-orch-triage` routes to likely-responsible repos and has them deliberate over cross-repo contracts.
 
-`/deliberate` is **adversarial**: it:
+`/repo-orch-deliberate` is **adversarial**: it:
 1. Involves ALL registered repos (not just routed candidates)
 2. Requires each specialist to **challenge the others' hypotheses**
 3. Forces explicit cross-examination via the mailbox before anyone is allowed to submit a final report
@@ -29,7 +29,7 @@ Requires: Claude Code v2.1.32+ and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
 
 ## Step 1 — Load all repos
 
-Read `.repo-orchestrator/registry.json`. Gather all repo entries. If the registry has more than 8 repos, warn: "Deliberating across >8 repos will be expensive. Consider using `/triage` to narrow the scope first. Continue? [y/N]"
+Read `.repo-orchestrator/registry.json`. Gather all repo entries. If the registry has more than 8 repos, warn: "Deliberating across >8 repos will be expensive. Consider using `/repo-orch-triage` to narrow the scope first. Continue? [y/N]"
 
 ---
 
@@ -56,7 +56,7 @@ Require at least one round of mailbox cross-examination before accepting final r
 
 After all specialists have submitted their reports:
 
-```
+```text
 ═══════════════════════════════════════════════════════════════
 DELIBERATION REPORT — <incident summary>
 Generated: <ISO8601 timestamp>

@@ -1,18 +1,19 @@
 ---
-name: graph-context
+name: repo-orch-graph
 description: "Build or refresh the graphify knowledge graph for one or all repos. Produces .repo-orchestrator/graphs/<name>/graph.json used by /triage to pre-populate specialist context, reducing token consumption."
 ---
 
-# /graph-context [repo]
+# /repo-orch-graph [repo]
 
 Build (or incrementally refresh) the graphify knowledge graph for all repos, or a single named repo.
 
 Usage:
-- `/graph-context` — build graphs for all repos in the registry
-- `/graph-context auth-service` — build/refresh graph for one repo
-- `/graph-context --rebuild` — force full rebuild even if graph exists
 
-Graphs are stored in `.repo-orchestrator/graphs/<name>/` and consumed automatically by `/triage`.
+- `/repo-orch-graph` — build graphs for all repos in the registry
+- `/repo-orch-graph auth-service` — build/refresh graph for one repo
+- `/repo-orch-graph --rebuild` — force full rebuild even if graph exists
+
+Graphs are stored in `.repo-orchestrator/graphs/<name>/` and consumed automatically by `/repo-orch-triage`.
 
 ---
 
@@ -22,7 +23,7 @@ Read `.repo-orchestrator/registry.json`. If it does not exist, stop:
 "Registry not found. Run `/init-context` first."
 
 If a repo name was provided, find that entry. If not found, stop:
-"Repo `<name>` not found in registry. Available: <list names>."
+"Repo `<name>` not found in registry. Available: see names in registry."
 
 ---
 
@@ -91,6 +92,7 @@ For each repo to process:
 3. Check if `--rebuild` was passed OR if no `graph.json` exists yet → full build. Otherwise → incremental update.
 
 **Full build:**
+
 ```powershell
 New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | Out-Null
 & $GRAPHIFY_PYTHON -m graphify <repoPath> `
@@ -101,6 +103,7 @@ New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | O
 ```
 
 **Incremental update (graph.json already exists):**
+
 ```powershell
 & $GRAPHIFY_PYTHON -m graphify <repoPath> `
     --output-dir ".repo-orchestrator/graphs/<name>" `
@@ -109,7 +112,8 @@ New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | O
 ```
 
 Print progress per repo:
-```
+
+```text
 Building graph for auth-service... done (N nodes, M edges)
 Building graph for payments...     done (N nodes, M edges)
 ```
@@ -117,20 +121,21 @@ Building graph for payments...     done (N nodes, M edges)
 Read the node/edge counts from `graph.json` (`graph.nodes` and `graph.edges` arrays) to fill in the summary.
 
 If graphify fails for a repo, print a warning and continue with the rest — do not abort the whole run:
-```
-⚠️  Graph build failed for <name>: <error summary>. /triage will fall back to direct file reads for this repo.
+
+```text
+⚠️  Graph build failed for <name>: <error summary>. /repo-orch-triage will fall back to direct file reads for this repo.
 ```
 
 ---
 
 ## Step 4 — Report
 
-```
+```text
 ✅ Knowledge graphs built:
 
   auth-service  → .repo-orchestrator/graphs/auth-service/graph.json  (42 nodes, 67 edges)
   payments      → .repo-orchestrator/graphs/payments/graph.json       (31 nodes, 48 edges)
 
 /triage will now use these graphs to pre-populate specialist context.
-Run /graph-context --rebuild to force a full rebuild after major refactors.
+Run /repo-orch-graph --rebuild to force a full rebuild after major refactors.
 ```

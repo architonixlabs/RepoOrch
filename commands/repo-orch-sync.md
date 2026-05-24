@@ -1,15 +1,16 @@
 ---
-name: sync-context
+name: repo-orch-sync
 description: "Incremental refresh: detect repo drift via fingerprint, re-index changed repos, preserve userEdited content, ingest context frontmatter back into registry.json."
 ---
 
-# /sync-context [repo]
+# /repo-orch-sync [repo]
 
 Refresh the registry for all repos, or a single named repo.
 
 Usage:
-- `/sync-context` — refresh all repos
-- `/sync-context auth-service` — refresh only the `auth-service` repo
+
+- `/repo-orch-sync` — refresh all repos
+- `/repo-orch-sync auth-service` — refresh only the `auth-service` repo
 
 ---
 
@@ -71,9 +72,9 @@ For each repo where code drift was detected (Step 3a ran), incrementally update 
     --no-viz
 ```
 
-Where `$GRAPHIFY_PYTHON` is found using the graphify detection logic from `/graph-context`. If graphify is not installed or fails, skip silently — the existing graph (if any) remains valid for unchanged files.
+Where `$GRAPHIFY_PYTHON` is found using the graphify detection logic from `/repo-orch-graph`. If graphify is not installed or fails, skip silently — the existing graph (if any) remains valid for unchanged files.
 
-If no graph exists yet for this repo, skip (do not do a full build here — that is `/graph-context`'s job).
+If no graph exists yet for this repo, skip (do not do a full build here — that is `/repo-orch-graph`'s job).
 
 ---
 

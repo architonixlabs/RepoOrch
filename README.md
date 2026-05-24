@@ -16,7 +16,7 @@ Without this plugin you manually figure out which services are affected, read th
 
 With this plugin:
 
-1. `/triage "Users getting 401 after auth refactor"` — the master reads your registry, routes to the responsible specialists, and spawns them as an **Agent Team**.
+1. `/repo-orch-triage "Users getting 401 after auth refactor"` — the master reads your registry, routes to the responsible specialists, and spawns them as an **Agent Team**.
 2. Each specialist reads its pre-built knowledge graph first (if available), emits a VERDICT, and deliberates directly with teammates over any cross-repo contracts via the mailbox.
 3. You receive a **single, ordered change plan** — with cross-repo dependency ordering, risks, and validation hints.
 4. **No files are modified.** You decide what to execute.
@@ -74,7 +74,7 @@ All service repos are **immediate subdirectories of the root**. This is the layo
 ### 1 — Interactive setup (recommended first-time path)
 
 ```text
-/setup
+/repo-orch-setup
 ```
 
 An interactive wizard that:
@@ -82,7 +82,7 @@ An interactive wizard that:
 1. Checks all prerequisites (Claude Code version, Node.js, Python, graphify)
 2. Shows a pass/fail table — required items block progress, optional items are offered as installs
 3. Offers to enable Agent Teams, install graphify, and build the Tier-1/2 components
-4. Prints a readiness summary, then hands off to `/init-context` automatically
+4. Prints a readiness summary, then hands off to `/repo-orch-init` automatically
 
 **Prerequisite checks:**
 
@@ -98,7 +98,7 @@ An interactive wizard that:
 ### 2 — Bootstrap only (skip the wizard)
 
 ```text
-/init-context
+/repo-orch-init
 ```
 
 What it does:
@@ -113,57 +113,57 @@ What it does:
 ### 3 — Triage a ticket
 
 ```text
-/triage "Users are getting 401 errors after the recent auth refactor"
+/repo-orch-triage "Users are getting 401 errors after the recent auth refactor"
 ```
 
 ### 4 — Root-cause an incident (adversarial mode)
 
 ```text
-/deliberate "Payments failing intermittently — unknown root cause"
+/repo-orch-deliberate "Payments failing intermittently — unknown root cause"
 ```
 
 ### 5 — Edit a repo's context
 
 ```text
-/edit-context auth-service
+/repo-orch-edit auth-service
 ```
 
 ### 6 — Refresh after code changes
 
 ```text
-/sync-context              # all repos
-/sync-context auth-service # one repo
+/repo-orch-sync              # all repos
+/repo-orch-sync auth-service # one repo
 ```
 
 ### 7 — Build knowledge graphs (token-saving, optional)
 
 ```text
-/graph-context              # build graphs for all repos
-/graph-context auth-service # build graph for one repo
-/graph-context --rebuild    # force full rebuild after a major refactor
+/repo-orch-graph              # build graphs for all repos
+/repo-orch-graph auth-service # build graph for one repo
+/repo-orch-graph --rebuild    # force full rebuild after a major refactor
 ```
 
-Graphs are stored in `.repo-orchestrator/graphs/<name>/graph.json`. Once built, `/triage` automatically queries them before spawning specialists — each specialist receives a pre-fetched graph summary and reads raw source files only for details not covered by the graph. This can cut per-triage token use significantly on large codebases.
+Graphs are stored in `.repo-orchestrator/graphs/<name>/graph.json`. Once built, `/repo-orch-triage` automatically queries them before spawning specialists — each specialist receives a pre-fetched graph summary and reads raw source files only for details not covered by the graph. This can cut per-triage token use significantly on large codebases.
 
 ---
 
 ## Token-saving architecture
 
-By default each `/triage` call has specialists cold-read source files for every ticket. The graphify integration changes this:
+By default each `/repo-orch-triage` call has specialists cold-read source files for every ticket. The graphify integration changes this:
 
 ```text
-/graph-context  →  builds graph.json per repo (one-time cost)
+/repo-orch-graph  →  builds graph.json per repo (one-time cost)
      ↓
-/triage         →  master pre-queries each candidate's graph (1200-token budget)
+/repo-orch-triage         →  master pre-queries each candidate's graph (1200-token budget)
      ↓
 specialist      →  reads GRAPH_SUMMARY first, targeted file reads only for gaps
 ```
 
-**When to run `/graph-context`:**
+**When to run `/repo-orch-graph`:**
 
-- After `/init-context` (if it didn't auto-build)
+- After `/repo-orch-init` (if it didn't auto-build)
 - After a major refactor (`--rebuild`)
-- `/sync-context` handles incremental updates automatically when code drift is detected
+- `/repo-orch-sync` handles incremental updates automatically when code drift is detected
 
 **Requires:** Python 3.10+ and `pip install graphifyy`. If graphify is not installed, the plugin degrades gracefully to direct file reads at every step.
 
@@ -178,7 +178,7 @@ Every specialist agent has:
 - Hard rule: "Never modify a file. Never commit, push, or open a PR."
 - Optional: add a project-scoped `PreToolUse` hook to hard-block write-like Bash commands (see `agents/repo-specialist-template.md`)
 
-The `/triage` and `/deliberate` commands spawn agents with `permissionMode: "plan"` (read + delegate only).
+The `/repo-orch-triage` and `/repo-orch-deliberate` commands spawn agents with `permissionMode: "plan"` (read + delegate only).
 
 **v0.2 guarantee:** the agents produce a plan document. The developer executes it.
 
@@ -186,9 +186,9 @@ The `/triage` and `/deliberate` commands spawn agents with `permissionMode: "pla
 
 ## Cost notes
 
-Routing caps the Agent Team at **3–5 repos** by default. Single-repo tickets skip the team entirely and use one subagent. For large workspaces (8+ repos), `/deliberate` will warn before spawning all specialists.
+Routing caps the Agent Team at **3–5 repos** by default. Single-repo tickets skip the team entirely and use one subagent. For large workspaces (8+ repos), `/repo-orch-deliberate` will warn before spawning all specialists.
 
-The `/graph-context` integration is the primary lever for reducing ongoing token cost — build the graphs once, benefit on every triage.
+The `/repo-orch-graph` integration is the primary lever for reducing ongoing token cost — build the graphs once, benefit on every triage.
 
 ---
 
@@ -234,16 +234,16 @@ pip install graphifyy
 uv tool install graphifyy
 ```
 
-Then run `/graph-context` to build the graphs. No other configuration needed.
+Then run `/repo-orch-graph` to build the graphs. No other configuration needed.
 
 ---
 
 ## Headless / CI usage (Agent SDK)
 
-`automation/triage_runner.mjs` exposes `runTriage()` for webhook handlers:
+`automation/repo-orch-triage_runner.mjs` exposes `runTriage()` for webhook handlers:
 
 ```javascript
-import { runTriage } from '.claude/plugins/repo-orchestrator/automation/triage_runner.mjs';
+import { runTriage } from '.claude/plugins/repo-orchestrator/automation/repo-orch-triage_runner.mjs';
 
 // In a GitHub/Jira webhook handler:
 const plan = await runTriage({
@@ -309,7 +309,7 @@ your-workspace/
 │   │   └── payments.md
 │   └── graphs/
 │       ├── auth-service/
-│       │   └── graph.json          Knowledge graph (built by /graph-context)
+│       │   └── graph.json          Knowledge graph (built by /repo-orch-graph)
 │       └── payments/
 │           └── graph.json
 └── .claude/
@@ -325,17 +325,17 @@ your-workspace/
 
 ### v0.2.1
 
-- **`/setup` command** — interactive installer that checks all prerequisites before bootstrapping
+- **`/repo-orch-setup` command** — interactive installer that checks all prerequisites before bootstrapping
   - Verifies Claude Code ≥ 2.1.32, workspace layout, Node.js ≥ 18, Python ≥ 3.10
   - Detects and reports optional components: graphify, uv, Tier-1 indexer, Tier-2 MCP server
   - Offers to fix missing optional items (install graphify, build tiers, create Agent Teams settings)
-  - Prints a readiness summary then hands off to `/init-context` automatically
-- SessionStart hook updated to suggest `/setup` for first-time users
+  - Prints a readiness summary then hands off to `/repo-orch-init` automatically
+- SessionStart hook updated to suggest `/repo-orch-setup` for first-time users
 - Automated release workflow now extracts changelog notes per version tag
 
 ### v0.2.0
 
-- **graphify integration** — `/graph-context` command builds per-repo knowledge graphs; `/triage` pre-queries them before spawning specialists; `/sync-context` incrementally updates graphs on drift; specialists read graph summary first and use targeted file reads only for gaps
+- **graphify integration** — `/repo-orch-graph` command builds per-repo knowledge graphs; `/repo-orch-triage` pre-queries them before spawning specialists; `/repo-orch-sync` incrementally updates graphs on drift; specialists read graph summary first and use targeted file reads only for gaps
 - Specialist template updated to consume `GRAPH_SUMMARY` from master context
 - Graceful degradation at every step when graphify is not installed
 
