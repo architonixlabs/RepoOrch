@@ -47,7 +47,7 @@ Regular subagents can only report to their caller. **Agent Teams** (Claude Code 
 /plugin marketplace add architonixlabs/RepoOrch
 
 # Install the plugin
-/plugin install repo-orchestrator@repo-orchestrator-dev
+/plugin install repo-orchestrator@repo-orchestrator
 ```
 
 ---
@@ -322,6 +322,16 @@ your-workspace/
 ---
 
 ## Changelog
+
+### v0.2.3
+
+- **Installation fix** — plugin manifest now passes `claude plugin validate` cleanly and installs via `/plugin install repo-orchestrator@repo-orchestrator`
+  - `author` field corrected to object format
+  - `hooks/hooks.json` rewritten to use the record format (`{ "hooks": { "SessionStart": [...] } }`) required by the hooks harness
+  - Removed unsupported `commands`, `agents`, `skills`, `hooks` fields from `plugin.json` (auto-discovered by convention)
+  - Removed unsupported `mcp` field from `plugin.json`
+  - Added YAML frontmatter to both skill files (`skills/repo-indexing/SKILL.md`, `skills/routing/SKILL.md`)
+- Install command in README corrected to `/plugin install repo-orchestrator@repo-orchestrator`
 
 ### v0.2.2
 
