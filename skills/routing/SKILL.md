@@ -112,7 +112,13 @@ For each repo, compute a raw match score. Score every token (original + expansio
 | JWT claim name match found in `authContracts.requires` or `authContracts.issues` | +3 |
 | Env var name match in `configContracts.envVars` | +2 |
 
-**Score normalization:** Divide the raw score by `(number of owns keywords + 1)`. This prevents repos with many generic owns keywords from always winning over focused ones with exact matches.
+**Score normalization:** Divide the raw score by `max(1, owns.length - 1)`. This dampens repos with many generic keywords without penalizing small repos that have a single highly-relevant keyword:
+
+- 1-keyword repo → divides by 1 (no change) — a single exact match stays at full strength
+- 3-keyword repo → divides by 2
+- 6-keyword repo → divides by 5
+
+This ensures a single exact `owns` match always beats a partial match on a keyword-rich repo.
 
 ---
 
@@ -139,7 +145,7 @@ If only 1 candidate has score > 0, routingConfidence = 100. If 0 candidates, rou
 
 Produce a **ROUTING CONTEXT** block that is passed verbatim to every specialist:
 
-```
+```text
 ROUTING CONTEXT
 ===============
 Ticket keywords (normalized): <comma-separated extracted + expanded tokens>
@@ -147,14 +153,17 @@ Routing confidence: <N>%
 Your routing score: <N> (raw=<N>, normalized=<N.N>)
 Reason you were selected: <matched owns / endpoints / events / name listed>
 
-Other candidates:
-  <repo2>  score=<N>  reason="..."
-  <repo3>  score=<N>  reason="..."
+Teammates in this triage (use agent name as the mailbox address):
+  <repo2>  agent: repo-<repo2>  score=<N>  reason="..."
+  <repo3>  agent: repo-<repo3>  score=<N>  reason="..."
 ```
 
-This context block serves two purposes:
-1. Tells each specialist **why** it was selected — so it can calibrate how much scrutiny to apply.
-2. Tells each specialist **who else** was selected — so it knows which teammates to deliberate with over cross-repo contracts.
+**Mailbox addressing rule:** When sending deliberation messages, use the agent name (the `repo-<name>` form, e.g., `repo-payments`) as the mailbox address — not the human-readable repo name. The agent name is listed in the "agent:" column above.
+
+This context block serves three purposes:
+1. Tells each specialist **why** it was selected — calibrate scrutiny accordingly.
+2. Tells each specialist **who else** is in the team and their **exact mailbox address**.
+3. Gives each specialist the routing confidence so they know when to be skeptical of their own selection.
 
 ---
 

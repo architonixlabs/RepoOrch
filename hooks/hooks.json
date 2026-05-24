@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"const fs=require('fs');const p='.repo-orchestrator/registry.json';if(!fs.existsSync(p)){process.stdout.write('\\u26a0\\ufe0f  repo-orchestrator: No registry found.\\n   Run /repo-orch-setup for guided installation (checks prerequisites + bootstraps workspace).\\n   Or run /repo-orch-init to skip the wizard and bootstrap directly.\\n');}\"",
+            "command": "node -e \"const fs=require('fs');const p=require('path');const cwd=process.cwd();const hasRegistry=fs.existsSync(p.join(cwd,'.repo-orchestrator/registry.json'));if(hasRegistry)process.exit(0);const entries=fs.readdirSync(cwd,{withFileTypes:true});const hasSubRepo=entries.some(e=>e.isDirectory()&&fs.existsSync(p.join(cwd,e.name,'.git')));if(!hasSubRepo)process.exit(0);process.stdout.write('\\u26a0\\ufe0f  repo-orchestrator: No registry found in this workspace.\\n   Run /repo-orch-setup for guided installation (checks prerequisites + bootstraps).\\n   Or run /repo-orch-init to skip the wizard and bootstrap directly.\\n');\"",
             "async": true
           }
         ]

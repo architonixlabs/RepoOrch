@@ -26,6 +26,7 @@ Large repos can have hundreds of files. **Do not read every file.** Prioritise i
 4. Entry point files: `src/main.*`, `cmd/main.*`, `app.*`, `server.*`, `index.*` (max 3 files)
 5. Route/controller/handler files: files named `*.routes.*`, `*.controller.*`, `*.handler.*`, `router.*` (max 5 files, first 100 lines each)
 6. Event definition files: files named `*.events.*`, `events.*`, `*.pubsub.*` (max 3 files)
+7. Protocol definition files (if REST routes yield nothing): `*.proto`, `*.graphql`, `*.gql`, `schema.graphql` (max 3 files)
 
 Stop reading once you have enough to fill in all frontmatter fields. Do not read test files, migration files, or lock files unless there is no other way to determine a field.
 
@@ -49,6 +50,30 @@ Scan route/controller files for HTTP method + path patterns:
 - Gin: `r.GET("/path"`, `r.POST`
 
 Format each as `METHOD /path`, e.g. `POST /login`.
+
+## GraphQL detection
+
+If the repo has no REST routes but contains `*.graphql`, `*.gql`, `schema.graphql`, or uses `@Resolver()` / `graphql-js` / `Apollo Server` / `strawberry` / `ariadne`:
+
+- Extract query and mutation names from schema files: `type Query { <name>(...): ... }`, `type Mutation { <name>(...): ... }`
+- Format as `QUERY <name>` or `MUTATION <name>`, e.g. `QUERY getUser`, `MUTATION createOrder`
+- Set a note in the context prose section: "This service exposes a GraphQL API — endpoints field contains resolver names, not HTTP paths."
+
+## gRPC detection
+
+If the repo contains `*.proto` files or uses `grpc` / `@grpc/grpc-js` / `grpcio` / `google.golang.org/grpc`:
+
+- Extract RPC method names from `.proto` files: `rpc <MethodName>(...) returns (...)`
+- Format as `RPC ServiceName/<MethodName>`, e.g. `RPC AuthService/Login`
+- Set a note in the context prose section: "This service exposes a gRPC API — endpoints field contains RPC method names."
+
+## WebSocket detection
+
+If the repo uses `socket.io`, `ws`, `@WebSocketGateway()` (NestJS), `@websocket_route` (Starlette), or similar:
+
+- Extract event names from `socket.on('event'`, `@SubscribeMessage('event')`, `ws.send(`
+- Classify emitted events as `emits` and received events as `consumes` (same as message broker events)
+- Set a note in the context prose section: "This service uses WebSocket — some endpoints are WebSocket event names."
 
 ## Event extraction
 

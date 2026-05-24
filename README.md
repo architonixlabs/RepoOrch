@@ -4,7 +4,7 @@
 
 [![Validate Plugin](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.5-blue.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.2.6-blue.svg)](.claude-plugin/plugin.json)
 
 ---
 
@@ -332,6 +332,19 @@ your-workspace/
 ---
 
 ## Changelog
+
+### v0.2.6
+
+- **Startup tier distinction** — specialists now choose between a Tier A (quick: frontmatter-only, fast) and Tier B (deep: full graph + skill + CLAUDE.md warmup) startup based on query complexity. Simple code-navigation questions no longer incur full warmup cost
+- **Agent description fix** — specialist `description` fields now encode invocation intent (architecture, impact analysis, code navigation, failure modes, incident triage) instead of raw noun lists, so Claude Code's routing layer makes better agent-selection decisions
+- **Mailbox addressing fixed** — ROUTING CONTEXT block now includes `agent: repo-<name>` alongside repo name, and deliberation instructions explicitly say to use the agent name as the mailbox address; eliminates failed mailbox sends
+- **Score normalization fix** — changed formula from `/ (owns.length + 1)` to `/ max(1, owns.length - 1)` so a single exact `owns` match always beats a partial match on a keyword-rich repo; prevents under-selection of focused single-domain services
+- **Deliberation ceiling → actionable steps** — unresolved risks after 2 deliberation rounds now produce a concrete manual verification step ("before executing Step N, verify in `<file>` that `<specific thing>`") instead of an open `[UNRESOLVED]` question mark
+- **Lens 7 unconditional** — architectural impact lens now runs for every RESPONSIBLE verdict in triage mode, not only when an architect asks; surfaces layering violations, SLO risks, and coupling points on every analysis
+- **Per-repo skill file enrichment notice** — `/repo-orch-init` PAUSE message now explicitly tells users which sections are auto-detected vs. which require human knowledge (gotchas, banned patterns); directs users to enrich before first triage
+- **GraphQL / gRPC / WebSocket detection** — indexing skill now detects GraphQL resolvers (`type Query/Mutation`), gRPC methods (`.proto` `rpc` declarations), and WebSocket events (`socket.on`, `@SubscribeMessage`); produces typed endpoint entries instead of silent empty arrays
+- **SessionStart hook scope guard** — hook now only fires when the current directory looks like a repo-orchestrator workspace (has at least one immediate subdirectory with `.git`); no longer prints in unrelated projects or the plugin repo itself
+- **Automation runner fixes** — command updated to `/repo-orch-triage` (was `/triage`); model updated to `claude-opus-4-7`; error messages reference `/repo-orch-init`; `runDeliberate()` export added for webhook handlers that need adversarial root-cause analysis
 
 ### v0.2.5
 

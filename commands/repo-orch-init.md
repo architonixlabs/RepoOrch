@@ -112,6 +112,19 @@ Pay attention to:
 
 To open a context file: use your editor or run `/repo-orch-edit <name>`.
 
+IMPORTANT — per-repo skill files will also be generated at:
+  .repo-orchestrator/skills/auth-service.md
+  .repo-orchestrator/skills/payments.md
+  ...
+
+These contain auto-detected content (critical files, code paths, test commands).
+The most valuable sections — "Known gotchas" and "Conventions and banned patterns" —
+cannot be automated. They encode team knowledge that lives outside the code:
+migration quirks, "never mock the DB" rules, startup-time side effects, etc.
+
+Please review and enrich the skill files before running your first triage.
+The richer these files are, the more accurate your specialists will be.
+
 When you are happy with the context files, reply "done" or "register".
 ```
 
