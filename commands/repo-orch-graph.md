@@ -83,6 +83,61 @@ if (-not $GRAPHIFY_PYTHON) {
 
 ---
 
+## Step 2.5 — Check for LLM API key
+
+graphify needs an LLM API key to analyse source code. Run this check before attempting any build:
+
+```powershell
+$GRAPHIFY_BACKEND = $null
+$GRAPHIFY_API_KEY = $null
+
+if ($env:ANTHROPIC_API_KEY)  { $GRAPHIFY_BACKEND = "anthropic"; $GRAPHIFY_API_KEY = $env:ANTHROPIC_API_KEY }
+elseif ($env:OPENAI_API_KEY) { $GRAPHIFY_BACKEND = "openai";    $GRAPHIFY_API_KEY = $env:OPENAI_API_KEY }
+elseif ($env:GEMINI_API_KEY) { $GRAPHIFY_BACKEND = "gemini";    $GRAPHIFY_API_KEY = $env:GEMINI_API_KEY }
+elseif ($env:DEEPSEEK_API_KEY){ $GRAPHIFY_BACKEND = "deepseek"; $GRAPHIFY_API_KEY = $env:DEEPSEEK_API_KEY }
+```
+
+If `$GRAPHIFY_BACKEND` is still `$null` after the check, stop and print:
+
+```text
+⚠️  Graph build requires an LLM API key — none found in the current shell.
+
+  graphify calls an LLM to analyse your source code.
+  Even though you are running inside Claude Code, the key is not
+  automatically forwarded to child processes.
+
+  ── Quickest fix (current session only) ──────────────────────────
+  $env:ANTHROPIC_API_KEY = "sk-ant-..."      # PowerShell
+  export ANTHROPIC_API_KEY="sk-ant-..."      # bash / zsh
+
+  ── Permanent fix (persists across sessions) ─────────────────────
+  Add the key to .claude/settings.json so Claude Code injects it
+  into every shell it spawns:
+
+    {
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+
+  Your Anthropic key lives at: https://console.anthropic.com/settings/keys
+  (OpenAI / Gemini / DeepSeek keys work too — set the matching variable above.)
+
+  ── Re-run after setting the key ─────────────────────────────────
+  /repo-orch-graph
+
+  /repo-orch-triage will fall back to direct file reads in the meantime
+  — no functionality is lost, triage just costs slightly more tokens.
+```
+
+If a key was found, continue and print a single line:
+
+```text
+  Using <GRAPHIFY_BACKEND> backend for graph build.
+```
+
+---
+
 ## Step 3 — Build graphs
 
 For each repo to process:
@@ -95,6 +150,10 @@ For each repo to process:
 
 ```powershell
 New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | Out-Null
+$env:ANTHROPIC_API_KEY  = if ($GRAPHIFY_BACKEND -eq "anthropic")  { $GRAPHIFY_API_KEY } else { $env:ANTHROPIC_API_KEY }
+$env:OPENAI_API_KEY     = if ($GRAPHIFY_BACKEND -eq "openai")     { $GRAPHIFY_API_KEY } else { $env:OPENAI_API_KEY }
+$env:GEMINI_API_KEY     = if ($GRAPHIFY_BACKEND -eq "gemini")     { $GRAPHIFY_API_KEY } else { $env:GEMINI_API_KEY }
+$env:DEEPSEEK_API_KEY   = if ($GRAPHIFY_BACKEND -eq "deepseek")   { $GRAPHIFY_API_KEY } else { $env:DEEPSEEK_API_KEY }
 & $GRAPHIFY_PYTHON -m graphify <repoPath> `
     --output-dir ".repo-orchestrator/graphs/<name>" `
     --mode deep `
@@ -120,7 +179,18 @@ Building graph for payments...     done (N nodes, M edges)
 
 Read the node/edge counts from `graph.json` (`graph.nodes` and `graph.edges` arrays) to fill in the summary.
 
-If graphify fails for a repo, print a warning and continue with the rest — do not abort the whole run:
+If graphify fails for a repo, print a warning and continue with the rest — do not abort the whole run.
+
+If the error output contains "api key" or "authentication" (case-insensitive):
+
+```text
+⚠️  Graph build failed for <name>: API key error — <error summary>.
+    The key was found in the shell but graphify could not authenticate.
+    Check that the key is valid at the provider's console.
+    /repo-orch-triage will fall back to direct file reads for this repo.
+```
+
+Otherwise:
 
 ```text
 ⚠️  Graph build failed for <name>: <error summary>. /repo-orch-triage will fall back to direct file reads for this repo.
