@@ -250,9 +250,14 @@ Registry updated: .repo-orchestrator/registry.json
 Please restart your Claude Code session so the newly written agents are loaded.
 
 After restarting you can:
+  - Verify setup works:          /repo-orch-status
   - Call a specialist directly:  @Auth Service Specialist what does the token refresh flow look like?
   - Triage a ticket:             /repo-orch-triage "Users getting 401 after auth refactor"
   - Root-cause an incident:      /repo-orch-deliberate "Payments failing intermittently"
   - Edit a context file:         /repo-orch-edit auth-service
   - Refresh after code changes:  /repo-orch-sync
+
+Smoke test — confirm routing works before your first real ticket:
+  /repo-orch-triage "<paste a recent bug title from your backlog>"
+  Expected: routing decision with ≥1 candidate and a reason string.
 ```

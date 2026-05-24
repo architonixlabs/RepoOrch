@@ -29,6 +29,13 @@ interface ScanResults {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const FIX_HINTS: Record<string, string> = {
+  'Agent Teams': 'Create .claude/settings.json with { "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" } }',
+  'graphify':    'Run: pip install graphifyy   (or: uv tool install graphifyy)',
+  'Tier-1 indexer':  'Run: cd .claude/plugins/repo-orchestrator/indexer && npm install && npm run build',
+  'Tier-2 MCP server': 'Run: cd .claude/plugins/repo-orchestrator/mcp && npm install && npm run build',
+};
+
 const icon = (s: Status) => {
   switch (s) {
     case 'OK':       return chalk.green('✓');
@@ -281,7 +288,7 @@ function buildInstallTasks(r: ScanResults, cwd: string) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-const VERSION = '0.2.4';
+const VERSION = '0.2.8';
 const cwd = process.cwd();
 
 // Banner
@@ -364,8 +371,33 @@ if (pending.length > 0) {
     }
   );
 
-  await listrInstall.run().catch(() => { /* errors shown inline by listr2 */ });
-  console.log(chalk.green('\n  Component setup complete.'));
+  const installErrors: Array<{ title: string; message: string }> = [];
+  await listrInstall.run().catch((err: unknown) => {
+    if (err && typeof err === 'object' && 'errors' in err) {
+      const errs = (err as { errors: Array<{ message: string }> }).errors;
+      errs.forEach((e, i) => {
+        const taskTitle = installTasks[i]?.title ?? 'unknown task';
+        installErrors.push({ title: taskTitle, message: e.message });
+      });
+    }
+  });
+
+  if (installErrors.length > 0) {
+    console.log(chalk.yellow('\n  Some components could not be installed automatically:'));
+    const sep = chalk.dim('  ' + '─'.repeat(62));
+    console.log(sep);
+    for (const { title, message } of installErrors) {
+      const component = Object.keys(FIX_HINTS).find(k => title.includes(k)) ?? title;
+      console.log(chalk.red(`\n  ✗  ${component}`));
+      console.log(chalk.dim(`     Error: ${message}`));
+      const hint = FIX_HINTS[component];
+      if (hint) console.log(chalk.cyan(`     Fix:   ${hint}`));
+    }
+    console.log(sep);
+    console.log(chalk.dim('\n  Fix the issues above, then re-run /repo-orch-setup.\n'));
+  } else {
+    console.log(chalk.green('\n  Component setup complete.'));
+  }
 } else {
   console.log(chalk.bold(chalk.cyan('\n  [2/3]')) + '  All optional components already installed — skipping.');
 }

@@ -63,7 +63,8 @@ Spawn all registered repo specialists as an Agent Team. Pass to each:
   > 5. **Even if you emit NOT_RESPONSIBLE for your own repo**, you must still act as a skeptic. Read every other specialist's hypothesis and challenge any that contradict a contract your service owns. Your value in this team is not only your own verdict — it is the cross-repo contract knowledge you hold. A hypothesis that passes unchallenged because you stayed silent is a missed root cause."
 
 - Hard rule: propose only, never modify files
-- Enable `permissionMode: "plan"`
+
+Note: read-only enforcement is provided by the specialists' `tools` allowlist (`Read, Grep, Glob, Bash`) and the PreToolUse hook defined in the specialist template. The `permissionMode: "plan"` frontmatter field has no effect on plugin-provided agents per Claude Code platform design — do not rely on it as a safety guarantee.
 
 ---
 
@@ -83,6 +84,15 @@ Track deliberation rounds. Each round:
 **Round ceiling:** After 3 rounds, if any hypothesis is still contested, apply the tie-break rule (Step 4b) rather than continuing.
 
 **Early exit:** If all specialists reach consensus on the root cause before 3 rounds, proceed to Step 5 immediately.
+
+**Missing specialist handling:** Before applying the tie-break rule, check whether every spawned specialist returned both an initial verdict and a final report. For any specialist that did not, add:
+
+```text
+[INCOMPLETE — repo-<name> did not return a report.
+ This repo was not included in the root cause assessment.]
+```
+
+to both SPECIALISTS CONSULTED and ROOT CAUSE ASSESSMENT. Adjust the final confidence label downward by one level (High → Medium, Medium → Low) for each incomplete specialist — the root cause assessment is less certain when not all repos were heard from.
 
 ### Step 4b — Tie-break rule
 

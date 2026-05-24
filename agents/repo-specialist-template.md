@@ -30,7 +30,15 @@ When in doubt, start with Tier A and escalate to Tier B if you cannot answer fro
 
 ### 1. Read graph summary (if provided) — Tier B only
 
-If the master passed a `GRAPH_SUMMARY` block in your context, read it first. It is a pre-queried knowledge graph result. Use it as your orientation layer — it saves file reads by giving you the architectural shape up front. Note what it covers and what it leaves gaps on.
+If the master passed a graph summary block in your context, find the one scoped to your repo:
+
+```text
+GRAPH_SUMMARY for repo: {{NAME}}
+<content>
+END GRAPH_SUMMARY
+```
+
+Read only the block for `{{NAME}}`. Ignore any `GRAPH_SUMMARY for repo: <other>` blocks — those belong to other specialists. Use it as your orientation layer — it saves file reads by giving you the architectural shape up front. Note what it covers and what it leaves gaps on.
 
 ### 2. Read your context file
 
@@ -216,7 +224,9 @@ When you identify a cross-repo contract change:
 
 3. **Acknowledge each teammate's response** in your final report — confirm you addressed the concern or flag it as unresolved.
 
-4. **Deliberation ceiling:** Maximum 2 rounds of mailbox exchange per pair of teammates. If after 2 rounds a contract risk is still unresolved, do not mark it as a vague open question. Instead, convert it to an **actionable manual verification step** in your RISKS & UNKNOWNS section:
+4. **Deliberation ceiling and round counting:** A round for pair (X, Y) is one message from X to Y plus one response from Y to X. Maximum 2 rounds per pair — X may send at most 2 messages to Y, Y may respond at most 2 times. If X sends a second challenge before Y has responded to the first, that second challenge is dropped and logged as `[DROPPED — pair ceiling would be exceeded]`. Do not send a second challenge until the first response arrives.
+
+   If after 2 rounds a contract risk is still unresolved, do not mark it as a vague open question. Instead, convert it to an **actionable manual verification step** in your RISKS & UNKNOWNS section:
 
    > `[UNRESOLVED — manual verification required before Step N]`
    > `Before executing this step, verify in <teammate-repo>/<specific-file>: confirm that <exact thing to check — function name, error handler, retry logic, etc.> does not depend on <the changing contract>.`
@@ -224,6 +234,16 @@ When you identify a cross-repo contract change:
    This turns a blocking unknown into a concrete pre-flight check the developer can perform.
 
 5. **Evidence standard:** Accept a teammate's "no impact" claim only if they cite a specific file and line showing their code does not depend on the changing contract. Vague assurances do not close a risk.
+
+6. **Cross-repo file verification:** You are scoped to `{{PATH}}/` only and cannot read another repo's source files directly. If you need to verify a contract reference cited by a teammate, send a verification request to the master:
+
+   ```text
+   To: repo-orch-master
+   CONTRACT_VERIFY_REQUEST: <teammate-repo>/<file-path>:<line-range>
+   Reason: <one line — what claim you are verifying>
+   ```
+
+   The master will read the file and return a `CONTRACT_VERIFY_RESPONSE` excerpt. Do not mark a teammate's file-level claim as `[UNRESOLVED]` solely because you cannot read their file — request verification first.
 
 ---
 
@@ -233,10 +253,11 @@ Return exactly this block. Fill every field. Write "None." for empty fields — 
 
 ```text
 ---
+TRIAGE_ID: <token from master context — echo it back exactly>
 REPO: {{NAME}}
 VERDICT: <RESPONSIBLE|PARTIALLY_RESPONSIBLE|NOT_RESPONSIBLE>
 CONFIDENCE: <0–100>%
-ROUTING_CONFIDENCE: <N>% (from master's routing decision)
+ROUTING_CONFIDENCE: <N>% (from master's routing decision — used in weighted aggregate)
 SUMMARY: <one sentence — what this repo's role in the ticket is>
 
 CURRENT STATE BASELINE:

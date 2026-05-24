@@ -4,7 +4,7 @@
 
 [![Validate Plugin](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.7-blue.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.2.8-blue.svg)](.claude-plugin/plugin.json)
 
 ---
 
@@ -332,6 +332,41 @@ your-workspace/
 ---
 
 ## Changelog
+
+### v0.2.8
+
+**Master agent and orchestration:**
+
+- **New master agent file (`agents/repo-orch-master.md`)** — master now has an explicit identity, escalation rules, synthesis constraints, `CONTRACT_VERIFY_REQUEST` handler, and hard rules; previously the master was only the ambient session with no declared capabilities
+- **`TRIAGE_ID` session token** — master generates a short deterministic token per triage and requires it echoed back in every specialist report; enables correct report-to-session matching when specialists return asynchronously
+- **ROUTING CONTEXT block validation** — master validates required fields (`Routing confidence`, `Your routing score`, `agent: repo-` entries) before passing to specialists; regenerates from raw scores if truncated
+- **`GRAPH_SUMMARY` wire format defined** — summaries wrapped as `GRAPH_SUMMARY for repo: <name> … END GRAPH_SUMMARY`; specialists read only their own named block, eliminating cross-contamination in multi-specialist context windows
+- **Duplicate graph-fetch removed from Step 3.5** — was re-running graphify for every candidate even though Step 2 had already fetched all summaries; doubled token cost and wall-clock on every multi-repo triage
+- **Candidate count guard in Step 3.5** — explicit trim-to-5 with warning if routing returns >5 candidates
+
+**Confidence and synthesis:**
+
+- **`ROUTING_CONFIDENCE`-weighted aggregate** — formula now `CONFIDENCE × ROUTING_CONFIDENCE/100` per specialist; borderline candidates contribute proportionally less; `ROUTING_CONFIDENCE` annotated as "used in weighted aggregate"
+- **Dependency resolution cross-check** — before emitting the plan, master verifies deliberation-claimed resolutions cite file+line; unsupported claims escalated to `[UNRESOLVED — evidence required]`
+- **`[PARTIAL]` flag on PARTIALLY_RESPONSIBLE plan steps** — steps from partial-ownership specialists carry `[PARTIAL — specialist owns only part of this area]`; was previously indistinguishable from a RESPONSIBLE step
+- **Same-file conflict detection** — `[CONFLICT]` notice emitted when two specialists propose changes to the same file
+- **`[INCOMPLETE]` notices for missing specialist reports** — silent specialist failures produce `[INCOMPLETE]` in SPECIALIST REPORTS and every affected plan step in both triage and deliberate modes; deliberate confidence stepped down one level per missing specialist
+
+**Deliberation protocol:**
+
+- **`CONTRACT_VERIFY_REQUEST` protocol** — specialists request cross-repo file reads from master; master returns `CONTRACT_VERIFY_RESPONSE` and logs the exchange in the triage report audit trail
+- **Deliberation round counting made explicit** — a round for pair (X,Y) is one message + one response; second challenge dropped with `[DROPPED]` if first response not yet received
+- **Evidence standard on single-repo fast path** — Step 3 (80%-confidence shortcut) now applies the same evidence check as the team path; unsupported claims become `[UNRESOLVED — evidence required]`
+- **Dropped-agent in-flight challenge handling** — challenges from dropped NOT_RESPONSIBLE agents are discarded; remaining specialists no longer blocked waiting for a response from an agent no longer in scope
+- **`permissionMode: "plan"` removed from triage and deliberate** — was a no-op on plugin-provided agents; enforcement comes from the `tools` allowlist and PreToolUse hook
+
+**Setup and UI:**
+
+- **New command: `/repo-orch-status`** — at-a-glance dashboard: repos, last-indexed timestamps, context/graph/skill/agent file presence, `[edited]`/`[no-owns]`/`[stale]` flags, actionable recommendations
+- **Setup runner error recovery** — failed install tasks now print `Error:` + `Fix:` with the exact command to run
+- **Smoke test in init Step 6 report** — concrete smoke test instruction so users can verify routing immediately after bootstrap
+- **SessionStart hook redesigned** — structured box with "First time here?" and "Already set up elsewhere?" sections
+- **Version strings synchronized** — setup runner `VERSION` and fallback banner updated from stale `0.2.4`
 
 ### v0.2.7
 

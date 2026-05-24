@@ -1,6 +1,6 @@
 {
   "name": "repo-orchestrator",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Turns a multi-repo microservice project into a coordinated AI agent team that proposes (never applies) cross-repo change plans.",
   "author": {
     "name": "Architonix",
