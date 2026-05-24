@@ -4,7 +4,7 @@
 
 [![Validate Plugin](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.4-blue.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.2.5-blue.svg)](.claude-plugin/plugin.json)
 
 ---
 
@@ -332,6 +332,17 @@ your-workspace/
 ---
 
 ## Changelog
+
+### v0.2.5
+
+- **Named specialist agents** — each generated agent now has a friendly display name (e.g., `Auth Service Specialist`, `Payments Specialist`) so developers, architects, and designers can call them directly by name for architecture questions, impact analysis, code navigation, and pre-change reviews — no triage required
+- **Per-repo skill files** — `/repo-orch-init` generates `.repo-orchestrator/skills/<name>.md` per repo: critical file map, known gotchas, conventions, banned patterns, and testing instructions. Specialists read this as their deepest domain knowledge layer before touching source files
+- **Richer specialist template** — 7 analysis lenses (added architecture/design lens for architects and designers); current-state baseline field; severity labels on all risks; routing confidence shown per report; deliberation ceiling (max 2 rounds per pair) with evidence standard (file+line required to close a risk)
+- **Enriched routing skill** — acronym expansion table (auth/jwt/rbac/k8s/…), synonym expansion table (login→auth/session, 401→jwt/token, …), score normalization to prevent keyword-count inflation, routing confidence signal passed to each specialist
+- **Enriched context template and registry schema** — new contract fields: `authContracts`, `errorContracts`, `configContracts`, `dataContracts`, `serviceLevel`, `testContracts`, `owner`, `apiVersion`, `deprecates`; specialists use these fields in contract-change analysis
+- **Richer triage output** — aggregate confidence score, current-state baseline section, rollback guidance, confidence advisory for developers
+- **Improved deliberate command** — max 3 rounds ceiling, evidence standard enforced, tie-break rule (recency → breadth → co-equal), `[UNRESOLVED — human decision required]` tag
+- **Stale command references fixed** — all `/init-context` and `/sync-context` references updated to `/repo-orch-init` and `/repo-orch-sync`
 
 ### v0.2.4
 

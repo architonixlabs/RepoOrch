@@ -1,6 +1,6 @@
 ---
 name: repo-orch-init
-description: "Bootstrap: discover all repos in the workspace, index them, generate editable context docs and specialist agents, and register them with the master. Pauses for user review before writing agents."
+description: "Bootstrap: discover all repos in the workspace, index them, generate editable context docs and specialist agents (each with a unique name and per-repo skill file), and register them with the master. Pauses for user review before writing agents."
 ---
 
 # /repo-orch-init
@@ -12,7 +12,7 @@ Bootstrap the repo-orchestrator for your workspace. Run this once from your work
 1. Discovers all repos under the workspace root
 2. Indexes each repo (language, frameworks, endpoints, events, dependencies)
 3. Writes an editable context document per repo — **then stops for your review**
-4. On your confirmation: generates specialist agents and updates `registry.json`
+4. On your confirmation: generates specialist agents (each with a unique name and a per-repo skill file) and updates `registry.json`
 
 ---
 
@@ -35,10 +35,11 @@ List all immediate subdirectories of `root`. Keep the ones that contain a `.git`
 
 **If `mode` is `"list"`:**
 Use the `repos` array as-is. Do not scan. For any entry whose `path` starts with a URL (e.g., `https://`):
+
 - Ask the user explicitly: "Clone `<url>` into `<local-path>`? This requires a network connection and will write to your filesystem. [y/N]"
 - Do not clone without explicit confirmation.
 
-If no repos are discovered, stop and output: "No git repositories found as immediate subdirectories of `<root>`. Check your workspace layout or switch to `mode: list` in `.repo-orchestrator/config.json`."
+If no repos are discovered, stop: "No git repositories found as immediate subdirectories of `<root>`. Check your workspace layout or switch to `mode: list` in `.repo-orchestrator/config.json`."
 
 ---
 
@@ -50,18 +51,15 @@ For each discovered repo, **try the Tier-1 indexer first**:
 node indexer/dist/index.js <repoPath>
 ```
 
-If this command succeeds (exit code 0), parse the JSON output as `facts`. If it fails or the file does not exist, fall back to **Tier-0 indexing using the `repo-indexing` skill** — read this skill now if you have not already:
-`skills/repo-indexing/SKILL.md`
+If this command succeeds (exit code 0), parse the JSON output as `facts`. If it fails or the file does not exist, fall back to **Tier-0 indexing using the `repo-indexing` skill** (`skills/repo-indexing/SKILL.md`).
 
 Apply the budget rule from that skill. Do not read every file. Extract: `languages`, `frameworks`, `owns`, `endpoints`, `emits`, `consumes`, `dependsOn`, `providesTo`, `fingerprint`.
 
 ---
 
-## Step 2.5 — Build knowledge graphs (optional, reduces triage token cost)
+## Step 2.5 — Build knowledge graphs (optional)
 
-After indexing all repos, attempt to build a graphify knowledge graph for each repo. This is a best-effort step — if graphify is not installed or fails, continue normally. `/repo-orch-triage` will fall back to direct file reads.
-
-For each repo, run from the workspace root:
+After indexing all repos, attempt to build a graphify knowledge graph for each repo. Best-effort — if graphify is not installed or fails, continue normally.
 
 ```powershell
 New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | Out-Null
@@ -72,24 +70,23 @@ New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | O
     --directed
 ```
 
-Where `$GRAPHIFY_PYTHON` is found using the same detection logic as `/repo-orch-graph`. If graphify is not installed, skip this step entirely and print:
+Use the detection logic from `/repo-orch-graph` to find `$GRAPHIFY_PYTHON`. If not installed, print:
 
 ```text
-ℹ️  graphify not installed — skipping knowledge graph build.
-    Run /repo-orch-graph after setup to build graphs and reduce future triage token cost.
+graphify not installed — skipping knowledge graph build.
+Run /repo-orch-graph after setup to build graphs and reduce future triage token cost.
 ```
-
-If graphify is installed but fails for a specific repo, print a warning for that repo and continue.
 
 ---
 
 ## Step 3 — Write context documents
 
 For each repo, create `.repo-orchestrator/context/<name>.md`:
+
 - Copy the template from `schemas/context-template.md`
 - Fill in all frontmatter fields with the indexed values
-- Fill in the prose sections (Purpose, Architecture & key modules, Public contracts, Data stores, Cross-repo dependencies, Known issues / gotchas, Glossary) with your findings
-- If a field is empty (e.g., no events found), write the empty array `[]` in frontmatter and "None identified." in the prose section
+- Fill in all prose sections with your findings
+- If a field is empty, write `[]` in frontmatter and "None identified." in the prose section
 
 Do NOT create `.claude/agents/` files yet. Do NOT update `registry.json` yet.
 
@@ -97,24 +94,25 @@ Do NOT create `.claude/agents/` files yet. Do NOT update `registry.json` yet.
 
 ## Step 4 — PAUSE for review (hard checkpoint)
 
-After writing all context files, output this message and **stop**. Do not proceed until the user responds.
+After writing all context files, output this message and **stop**:
 
 ```text
-✅ Context files written for N repo(s):
+Context files written for N repo(s):
 
-  • auth-service    → .repo-orchestrator/context/auth-service.md
-  • payments        → .repo-orchestrator/context/payments.md
+  auth-service    -> .repo-orchestrator/context/auth-service.md
+  payments        -> .repo-orchestrator/context/payments.md
   ...
 
-📝 Please review and edit these files now.
-   Pay attention to:
-   - The `owns` field (used for routing — add domain keywords a ticket author would use)
-   - The `endpoints`, `emits`, `consumes` fields (cross-repo contracts)
-   - The prose sections (your specialist agents will read these)
+Please review and edit these files now.
+Pay attention to:
+  - The `owns` field (routing keywords — what would a ticket author say to describe a problem here?)
+  - The `endpoints`, `emits`, `consumes` fields (cross-repo contracts)
+  - The `authContracts`, `errorContracts`, `dataContracts` fields (specialist analysis depth)
+  - The prose sections (your specialist agents will read these to understand the service)
 
-   To open a context file: use your editor or run `/repo-orch-edit <name>`.
+To open a context file: use your editor or run `/repo-orch-edit <name>`.
 
-When you are happy with the context files, reply "done" or "register" to generate the specialist agents and update the registry.
+When you are happy with the context files, reply "done" or "register".
 ```
 
 ---
@@ -123,23 +121,81 @@ When you are happy with the context files, reply "done" or "register" to generat
 
 Wait for the user to reply with "done", "register", "yes", "continue", or similar affirmative. Then:
 
-### 5a — Generate specialist agents
+### 5a — Derive agent display name
+
+For each repo, derive a **friendly display name** for the specialist agent. The display name makes the agent easy to call directly by name. Rules:
+
+- Title-case the repo name, replacing hyphens/underscores with spaces
+- Append "Specialist": `auth-service` → "Auth Service Specialist", `payments` → "Payments Specialist"
+- Store as `{{DISPLAY_NAME}}` for template substitution
+
+Users can then invoke agents directly by name (e.g., `@Auth Service Specialist` or `@Payments Specialist`) without needing to remember the `repo-` prefix convention.
+
+### 5b — Generate per-repo skill files
+
+For each repo, create `.repo-orchestrator/skills/<name>.md`. This is the deepest layer of domain knowledge for the specialist — it encodes what a new engineer would need to know that is NOT in the source code comments.
+
+Write the skill file with this structure:
+
+```markdown
+---
+name: {{NAME}}-domain-knowledge
+description: "Deep domain knowledge for the {{NAME}} repo — conventions, critical paths, known gotchas, and testing instructions for the {{DISPLAY_NAME}}."
+---
+
+# {{DISPLAY_NAME}} — Domain Knowledge
+
+## Critical files
+
+List the 3–5 files a new engineer working on a ticket would read first, with one-line descriptions of each.
+
+## Known gotchas
+
+Sharp edges that would surprise a generalist:
+- <specific gotcha with file reference if applicable>
+
+## Conventions and banned patterns
+
+Team decisions and patterns NOT to use:
+- <convention or ban with reason>
+
+## Critical code paths
+
+The most important execution flows — trace the main happy path through the codebase:
+- <flow name>: <entry point file> → <key intermediate files> → <output/response>
+
+## Testing
+
+How to run tests for this service:
+- Unit: <command>
+- Integration: <command>
+- Contract: <command if applicable>
+
+What to test before any change touches a public contract (endpoint, event, JWT claim):
+- <specific assertion or test scenario>
+```
+
+Fill in all sections with what you discovered during indexing. Write "None identified." for sections with no findings.
+
+### 5c — Generate specialist agents
 
 For each repo, create `.claude/agents/repo-<name>.md` from `agents/repo-specialist-template.md`:
-- Replace `{{NAME}}` with the repo name
+
+- Replace `{{NAME}}` with the repo name (e.g., `auth-service`)
+- Replace `{{DISPLAY_NAME}}` with the derived display name (e.g., `Auth Service Specialist`)
 - Replace `{{PATH}}` with the repo path (e.g., `./auth-service`)
-- Replace `{{OWNS_CSV}}` with the `owns` array joined by `, `
-- Replace `{{ENDPOINTS_CSV}}` with the `endpoints` array joined by `, ` (or "none" if empty)
+- Replace `{{OWNS_CSV}}` with the `owns` array joined by `","` (comma-space)
+- Replace `{{ENDPOINTS_CSV}}` with the `endpoints` array joined by `","` (comma-space), or `"none"` if empty
 
-Read the current values from the context file's frontmatter (the user may have edited them).
+Read current values from the context file frontmatter (the user may have edited them since Step 3).
 
-### 5b — Write / update `registry.json`
+### 5d — Write / update `registry.json`
 
-For each repo, upsert the entry in `.repo-orchestrator/registry.json`. Structure per `schemas/registry.schema.json`. Set `lastIndexed` to the current ISO8601 timestamp. Set `userEdited: false` (the user has reviewed but this is the first write). Validate the file against `schemas/registry.schema.json` before saving.
+For each repo, upsert the entry in `.repo-orchestrator/registry.json`. Structure per `schemas/registry.schema.json`. Set `lastIndexed` to the current ISO8601 timestamp. Set `userEdited: false`. Validate before saving.
 
-### 5c — Ensure `.claude/settings.json` has Agent Teams enabled
+### 5e — Ensure `.claude/settings.json` has Agent Teams enabled
 
-Check whether `.claude/settings.json` exists. If it does not exist, offer to create it:
+Check whether `.claude/settings.json` exists. If not, offer to create it:
 
 "May I create `.claude/settings.json` to enable Agent Teams (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`)? This is required for the multi-repo deliberation flow. [y/N]"
 
@@ -156,23 +212,32 @@ If the user agrees, create:
 }
 ```
 
-If the file exists, check if `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is already set. If not, offer to add it.
+If the file exists, check whether `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is already set. If not, offer to add it.
 
 ---
 
 ## Step 6 — Report
 
-Output a summary:
-
 ```text
-🎉 Master now knows N repo agent(s):
+Master now knows N repo specialist(s):
 
-  repo-auth-service    → .claude/agents/repo-auth-service.md
-  repo-payments        → .claude/agents/repo-payments.md
+  Auth Service Specialist    (repo-auth-service)   -> .claude/agents/repo-auth-service.md
+  Payments Specialist        (repo-payments)        -> .claude/agents/repo-payments.md
+  ...
+
+Per-repo skill files:
+  .repo-orchestrator/skills/auth-service.md
+  .repo-orchestrator/skills/payments.md
   ...
 
 Registry updated: .repo-orchestrator/registry.json
 
-⚠️  Please restart your Claude Code session so the newly written project agents are loaded.
-    Then use /repo-orch-triage <ticket> to route work to the appropriate specialists.
+Please restart your Claude Code session so the newly written agents are loaded.
+
+After restarting you can:
+  - Call a specialist directly:  @Auth Service Specialist what does the token refresh flow look like?
+  - Triage a ticket:             /repo-orch-triage "Users getting 401 after auth refactor"
+  - Root-cause an incident:      /repo-orch-deliberate "Payments failing intermittently"
+  - Edit a context file:         /repo-orch-edit auth-service
+  - Refresh after code changes:  /repo-orch-sync
 ```

@@ -1,11 +1,11 @@
 ---
 name: repo-orch-triage
-description: "Master controller: route a ticket to responsible repo specialists, have them deliberate, and return a single consolidated change plan. Propose-only — no files are modified."
+description: "Master controller: route a ticket to responsible repo specialists, have them deliberate, and return a single consolidated change plan with confidence aggregate, current-state baseline, ordered steps, and rollback guidance. Propose-only — no files are modified."
 ---
 
 # /repo-orch-triage
 
-Route a ticket or feature request to the responsible repo specialists and synthesise a consolidated change plan.
+Route a ticket or feature request to the responsible repo specialists and synthesize a consolidated, developer-ready change plan.
 
 Usage: `/repo-orch-triage "Users are getting 401 errors after the recent auth refactor"`
 
@@ -19,31 +19,34 @@ Requires: Claude Code v2.1.32+ and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
 
 Read `.repo-orchestrator/registry.json`. If not found, stop: "Registry not found. Run `/repo-orch-init` first."
 
-Use the `routing` skill (`skills/routing/SKILL.md`) to select candidate repos. Cap at 5.
+Use the `routing` skill (`skills/routing/SKILL.md`) to select candidate repos. The skill returns:
 
-Print the routing decision (keywords extracted, candidates with scores).
+- Normalized ticket keywords
+- Ranked candidates with scores and reasons
+- A `routingConfidence` percentage for the top candidate
 
-If 0 candidates: stop and report "No responsible repo identified. Review the `owns` fields in `.repo-orchestrator/registry.json` or run `/repo-orch-sync`."
+Print the full routing decision block before proceeding.
+
+If 0 candidates: stop and report "No responsible repo identified. Review the `owns` fields in `.repo-orchestrator/registry.json` or run `/repo-orch-edit <name>` to add domain keywords."
 
 ---
 
 ## Step 2 — Single-repo shortcut
 
-If routing returns exactly 1 candidate with high confidence (score ≥ 4 or no other repo scored):
-- Skip the Agent Team entirely.
-- Spawn a single subagent using the candidate's `agentType`.
-- Pass the full ticket text and instruct it to produce the standard report block.
-- Jump to Step 5.
+If the routing skill returns exactly 1 candidate **or** the top candidate's `routingConfidence` ≥ 80% with a score gap ≥ 4 from the second:
+
+- Skip the Agent Team entirely
+- Spawn a single subagent using the candidate's `agentType`
+- Pass the full ticket text and the ROUTING CONTEXT block
+- Jump to Step 5 when the report arrives
 
 ---
 
-## Step 2.5 — Pre-fetch graph summaries (reduces specialist token cost)
+## Step 2.5 — Pre-fetch graph summaries
 
-Before spawning any agents, check each candidate repo for a pre-built knowledge graph:
+Before spawning agents, check each candidate for a pre-built knowledge graph.
 
-For each candidate, check if `.repo-orchestrator/graphs/<name>/graph.json` exists.
-
-If it does, run a targeted BFS query against it using the routing keywords extracted in Step 1:
+For each candidate where `.repo-orchestrator/graphs/<name>/graph.json` exists:
 
 ```powershell
 & $GRAPHIFY_PYTHON -m graphify query "<routing keywords joined by space>" `
@@ -51,9 +54,7 @@ If it does, run a targeted BFS query against it using the routing keywords extra
     --budget 1200
 ```
 
-Where `$GRAPHIFY_PYTHON` is found using the graphify detection logic from `/repo-orch-graph`. If graphify is not installed, skip this step for all repos.
-
-Collect the output per repo as `GRAPH_SUMMARY_<name>`. If the query fails or the file does not exist, set `GRAPH_SUMMARY_<name>` to `null` — the specialist will fall back to direct file reads.
+Use the graphify detection logic from `/repo-orch-graph`. If graphify is not installed or fails for a repo, set `GRAPH_SUMMARY_<name>` to `null` — the specialist falls back to direct file reads.
 
 ---
 
@@ -61,78 +62,124 @@ Collect the output per repo as `GRAPH_SUMMARY_<name>`. If the query fails or the
 
 For 2–5 candidates, spawn an **Agent Team** using the candidates' `agentType` values from the registry.
 
-Set each teammate's system context to include:
-- The full ticket text
-- The registry entry for their repo (name, path, owns, endpoints, emits, consumes)
-- `GRAPH_SUMMARY_<name>` if available (pre-fetched graph query result — read this first before touching raw files)
-- Instruction to read their context file on startup
-- Instruction to perform the VERDICT step first before any deep analysis
-- Instruction to use the mailbox to deliberate with named teammates over cross-repo contracts
+Pass to each specialist in their system context:
+- Full ticket text
+- Registry entry for their repo (all fields — specialists use `authContracts`, `errorContracts`, `dataContracts`, etc. for contract analysis)
+- `GRAPH_SUMMARY_<name>` if available
+- The full ROUTING CONTEXT block (keywords, routing confidence, their score, reason selected, other candidates)
+- Instruction: read startup sequence in order (graph summary → context file → per-repo skill → CLAUDE.md → selective source reads)
+- Instruction: emit VERDICT first before any deep analysis
+- Instruction: deliberate with named teammates over cross-repo contracts via the mailbox (max 2 rounds per pair)
 - Hard rule: propose only, never modify files
 
-Enable `permissionMode: "plan"` for all teammates (read + delegate tools only — no write tools).
+Enable `permissionMode: "plan"` for all teammates.
 
 ---
 
 ## Step 4 — Collect verdicts and deliberate
 
-Wait for all teammates to emit their VERDICT line.
+After all teammates emit their VERDICT:
 
-Drop any teammate whose verdict is `NOT_RESPONSIBLE` with confidence ≥ 80%.
+1. Drop any teammate with `NOT_RESPONSIBLE` and confidence ≥ 80%.
 
-Allow remaining specialists to deliberate via the mailbox over any cross-repo contracts they identified (changed endpoint shapes, event schema changes, shared DB fields, JWT claim changes).
+2. Compute **aggregate routing confidence** = weighted average of remaining specialists' individual confidence scores.
 
-Each specialist should acknowledge the other's concerns before finalising their report.
+3. Allow remaining specialists to deliberate via the mailbox (max 2 rounds per pair).
+
+4. Enforce the evidence standard: a "no impact" claim from a specialist must cite a file and line — vague assurances are flagged as unresolved.
+
+5. After deliberation completes (or hits the 2-round ceiling), collect final report blocks from all remaining specialists.
 
 ---
 
-## Step 5 — Synthesise the plan
+## Step 5 — Synthesize the consolidated plan
 
-After all specialists have returned their report blocks, synthesise a single consolidated plan for the developer:
+After all specialist reports arrive, produce the triage output:
 
 ```text
 ═══════════════════════════════════════════════════════════════
-TRIAGE REPORT — <ticket summary>
+TRIAGE REPORT
+Ticket:    <full ticket text>
 Generated: <ISO8601 timestamp>
 ═══════════════════════════════════════════════════════════════
 
 ROUTING
-  Ticket keywords: <keywords>
-  Responsible repos: <repo1>, <repo2>, ...
+  Keywords:          <normalized ticket keywords>
+  Candidates:        <repo1> (score=N), <repo2> (score=N), ...
+  Routing confidence: <N>% — <brief reason, e.g. "auth-service owns JWT/token keywords">
+
+AGGREGATE CONFIDENCE: <N>%
+  (weighted average of specialist verdicts; below 60% = low confidence — flag for human review)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CURRENT STATE BASELINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  (Aggregated from specialist "CURRENT STATE BASELINE" fields)
+  <repo-name>: <what the code does today in the affected area>
+  <repo-name>: <recent commits that provide context>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SPECIALIST REPORTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-[Include each specialist's full report block here]
+<Include each specialist's full report block here, in routing-score order>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CONSOLIDATED CHANGE PLAN
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Ordered steps (resolve cross-repo dependencies before dependents):
+Execution order (deploy dependencies before dependents):
 
-1. [repo-name] <change description>
-   Files: <specific files to touch>
-   Depends on: (none | step N completing first)
+Step 1  [<repo-name>]  <change description>
+        Files:      <specific files, with line ranges where known>
+        Why:        <reason this change is needed>
+        Depends on: None | Step N
 
-2. [repo-name] <change description>
-   ...
+Step 2  [<repo-name>]  <change description>
+        Files:      ...
+        Why:        ...
+        Depends on: Step 1
 
-CROSS-REPO CONTRACT CHANGES:
-  <If any endpoint, event, or shared schema is changing, list it here with all affected repos>
+...
 
-RISKS:
-  <Aggregated risks from all specialist reports>
+CONTRACT CHANGES:
+  <If any endpoint, event, or shared schema is changing:>
+  <contract type>  <name/path>: <old → new>
+  Downstream repos that must also update: <names>
+
+RISKS:  (aggregated from all specialist reports, sorted by severity)
+  [HIGH]   <risk description> — <which repo, what to watch>
+  [MEDIUM] <risk description>
+  [LOW]    <risk description>
+  [UNRESOLVED — awaiting <teammate>]  <open item from deliberation>
+
+ROLLBACK GUIDANCE:
+  <How to detect that the change should be reverted:>
+  - Signal: <metric spike / log pattern / error rate threshold>
+  - Rollback step: [<repo-name>] <what to revert and how>
+  - Order: <if rollback must be ordered, specify>
+  (If no rollback is needed: "Changes are backward-compatible — revert by reverting the PR.")
 
 VALIDATION:
-  <Aggregated validation hints — how to test the complete change end-to-end>
+  <Aggregated validation hints — how to test the full change end-to-end>
+  - <specific test command or assertion>
+  - <cross-repo integration test to run>
+  - <expected behavior that confirms the fix is complete>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️  This is a PROPOSED PLAN only. No files have been modified.
+⚠️  PROPOSED PLAN ONLY — no files have been modified.
     Review the plan, then execute the steps manually or with your team.
+    Confidence: <N>% — <high/medium/low — note if human review is advised>
 ═══════════════════════════════════════════════════════════════
 ```
+
+### Confidence guidance for the developer
+
+After printing the plan, add one of:
+
+- **Confidence ≥ 80%:** "High confidence — routing and analysis are well-grounded. Proceed after code review."
+- **Confidence 60–79%:** "Medium confidence — one or more areas have incomplete evidence. Review the RISKS section carefully before executing."
+- **Confidence < 60%:** "Low confidence — the ticket may be ambiguous or the registry `owns` fields may need updating. Consider running `/repo-orch-deliberate` for deeper adversarial analysis, or `/repo-orch-edit` to improve routing accuracy."
 
 ---
 

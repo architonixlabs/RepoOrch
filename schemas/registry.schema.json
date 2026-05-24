@@ -26,7 +26,8 @@
         "required": [
           "name", "path", "agentType", "agentFile", "contextFile",
           "languages", "frameworks", "owns", "endpoints", "emits",
-          "consumes", "dependsOn", "providesTo", "fingerprint", "lastIndexed"
+          "consumes", "dependsOn", "providesTo", "fingerprint", "lastIndexed",
+          "userEdited"
         ],
         "additionalProperties": false,
         "properties": {
@@ -109,7 +110,164 @@
           },
           "userEdited": {
             "type": "boolean",
-            "description": "True when a human has manually edited this entry. /sync-context will not overwrite without confirmation."
+            "default": false,
+            "description": "True when a human has manually edited this entry. /repo-orch-sync will not overwrite user-edited entries without confirmation."
+          },
+          "owner": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Ownership and contact information for this repo.",
+            "properties": {
+              "team": {
+                "type": "string",
+                "description": "Team name, e.g. 'Platform', 'Payments'."
+              },
+              "contact": {
+                "type": "string",
+                "description": "Slack channel, email alias, or GitHub team."
+              },
+              "oncall": {
+                "type": "string",
+                "description": "PagerDuty rotation name or equivalent."
+              }
+            }
+          },
+          "apiVersion": {
+            "type": "string",
+            "description": "Current public API version, e.g. 'v2'."
+          },
+          "deprecates": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Older API versions this release supersedes, e.g. ['v1']."
+          },
+          "authContracts": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Auth and authorization contracts for this service.",
+            "properties": {
+              "requires": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "JWT claims required on inbound requests, e.g. ['sub (userId UUID)', 'role (admin|user)']."
+              },
+              "issues": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "JWT claims this service adds to tokens it issues (auth services only)."
+              },
+              "scopes": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "OAuth scopes or RBAC roles required to call endpoints, e.g. ['read:orders', 'write:payments']."
+              }
+            }
+          },
+          "errorContracts": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Error handling contracts callers depend on.",
+            "properties": {
+              "codes": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "HTTP status codes deliberately returned and their semantics, e.g. ['400 validation failure', '503 dependency down']."
+              },
+              "idempotent": {
+                "description": "Whether mutating endpoints are idempotent (safe to retry on timeout). true | false | 'partial — see Known issues'.",
+                "oneOf": [
+                  { "type": "boolean" },
+                  { "type": "string" }
+                ]
+              },
+              "retryOn": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "HTTP status codes callers may safely retry, e.g. ['503', '429']."
+              },
+              "retryStrategy": {
+                "type": "string",
+                "description": "Retry strategy callers should use, e.g. 'exponential backoff, max 3 attempts'."
+              }
+            }
+          },
+          "configContracts": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Shared environment variables and feature flags.",
+            "properties": {
+              "envVars": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Environment variables shared with or depended on from other services, e.g. ['JWT_SECRET (shared with auth-service)']."
+              },
+              "featureFlags": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Feature flags that affect public behavior, e.g. ['ENABLE_NEW_CHECKOUT (LaunchDarkly)']."
+              }
+            }
+          },
+          "dataContracts": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "DB tables and cache keys other services access directly.",
+            "properties": {
+              "sharedTables": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "DB tables or columns read/written by other services, e.g. ['users.id (read by notifications)']."
+              },
+              "sharedCacheKeys": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Cache keys other services depend on, e.g. ['session:<userId> (read by api-gateway)']."
+              }
+            }
+          },
+          "serviceLevel": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Service level objectives for this service.",
+            "properties": {
+              "latencyTarget": {
+                "type": "string",
+                "description": "Latency target, e.g. 'p95 < 200ms'."
+              },
+              "throughput": {
+                "type": "string",
+                "description": "Throughput target, e.g. '500 RPS sustained, burst to 2000'."
+              },
+              "availability": {
+                "type": "string",
+                "description": "Availability target, e.g. '99.9% (allows ~8.7h downtime/year)'."
+              },
+              "degradedMode": {
+                "type": "string",
+                "description": "Behavior when dependencies are unavailable, e.g. 'returns cached data when DB is unreachable'."
+              }
+            }
+          },
+          "testContracts": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Test suites and contract tests that encode cross-repo behavior.",
+            "properties": {
+              "integrationSuite": {
+                "type": "string",
+                "description": "Command to run integration tests, e.g. 'npm run test:integration in auth-service'."
+              },
+              "contractTests": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Pact or CDC test file paths, e.g. ['pact/auth-payments.json']."
+              },
+              "e2eScenarios": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Key end-to-end scenarios covered, e.g. ['checkout happy path', '401 on expired token']."
+              }
+            }
           }
         }
       }

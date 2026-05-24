@@ -16,9 +16,9 @@ Usage:
 
 ## Step 1 — Load registry
 
-Read `.repo-orchestrator/registry.json`. If it does not exist, stop: "Registry not found. Run `/init-context` first."
+Read `.repo-orchestrator/registry.json`. If it does not exist, stop: "Registry not found. Run `/repo-orch-init` first."
 
-If a repo name was provided, find that entry. If not found, stop: "Repo `<name>` not found in registry. Available: <list names>."
+If a repo name was provided, find that entry. If not found, stop: "Repo `<name>` not found in registry. Available: list all names from the registry."
 
 ---
 
@@ -27,23 +27,26 @@ If a repo name was provided, find that entry. If not found, stop: "Repo `<name>`
 For each repo to process:
 
 1. Compute a fresh fingerprint using the method from `skills/repo-indexing/SKILL.md`.
-2. Compare to `registry.json` entry's `fingerprint`.
-3. Also check if the context file (`.repo-orchestrator/context/<name>.md`) has been modified since `lastIndexed` (compare file mtime to the `lastIndexed` timestamp).
+2. Compare to the `registry.json` entry's `fingerprint`.
+3. Check if the context file (`.repo-orchestrator/context/<name>.md`) was modified after `lastIndexed` (compare file mtime to the `lastIndexed` timestamp).
 
 **Decision:**
-- If fingerprint unchanged AND context file not modified: repo is up to date. Skip it and report "No drift detected."
-- If fingerprint changed: code has changed — re-index.
-- If context file is newer than `lastIndexed`: user has made manual edits — ingest frontmatter (Step 3b).
+
+- If fingerprint unchanged AND context file not modified: repo is up to date — skip and report "No drift detected."
+- If fingerprint changed: code has changed — re-index (Step 3a).
+- If context file is newer than `lastIndexed`: user made manual edits — ingest frontmatter (Step 3b).
 
 ---
 
 ## Step 3a — Re-index changed repos
 
 For each repo where code drift was detected:
-- Run the same indexing flow as `/init-context` Step 2 (try Tier-1 indexer, fall back to `repo-indexing` skill).
+
+- Run the same indexing flow as `/repo-orch-init` Step 2 (try Tier-1 indexer, fall back to `repo-indexing` skill).
 - Produce new values for all structured fields.
 
 **Before overwriting the context file:**
+
 - If `userEdited: true` in the registry entry, diff the new indexed values against the current context frontmatter.
 - If the diff is non-trivial (owns/endpoints/emits/consumes changed), show the diff and ask: "The indexed data for `<name>` has changed. Overwrite the `userEdited` context with new values? [y/N/show-diff]"
 - If the user says N, preserve the existing content and set `userEdited: true`. Update only `fingerprint` and `lastIndexed`.
@@ -54,8 +57,9 @@ For each repo where code drift was detected:
 ## Step 3b — Ingest manual frontmatter edits
 
 For repos where the context file is newer than `lastIndexed`:
+
 - Parse the YAML frontmatter from `.repo-orchestrator/context/<name>.md`.
-- Update the matching fields in `registry.json` (`owns`, `endpoints`, `emits`, `consumes`, `dependsOn`, `providesTo`).
+- Update the matching fields in `registry.json` (`owns`, `endpoints`, `emits`, `consumes`, `dependsOn`, `providesTo`, plus any contract fields that were edited: `authContracts`, `errorContracts`, `configContracts`, `dataContracts`, `serviceLevel`, `testContracts`).
 - Set `userEdited: true` on the registry entry.
 - Do NOT overwrite prose sections — only the registry JSON.
 
@@ -74,7 +78,7 @@ For each repo where code drift was detected (Step 3a ran), incrementally update 
 
 Where `$GRAPHIFY_PYTHON` is found using the graphify detection logic from `/repo-orch-graph`. If graphify is not installed or fails, skip silently — the existing graph (if any) remains valid for unchanged files.
 
-If no graph exists yet for this repo, skip (do not do a full build here — that is `/repo-orch-graph`'s job).
+If no graph exists yet for this repo, skip (full builds are `/repo-orch-graph`'s job).
 
 ---
 
@@ -82,18 +86,20 @@ If no graph exists yet for this repo, skip (do not do a full build here — that
 
 For each re-indexed repo, compare the new `owns` and the derived agent description to the existing agent file. If materially different (owns list changed, or description would change), regenerate `.claude/agents/repo-<name>.md` from the template using the updated values.
 
+Also regenerate the per-repo skill file `.repo-orchestrator/skills/<name>.md` if `owns`, `endpoints`, `emits`, `authContracts`, or `errorContracts` changed — the skill encodes this domain knowledge for the specialist.
+
 ---
 
 ## Step 5 — Validate and save registry
 
 Validate the updated `registry.json` against `schemas/registry.schema.json`. Write it. Report:
 
-```
+```text
 Sync complete.
 
-  auth-service    ✅ re-indexed (code drift detected)
-  payments        ✅ frontmatter ingested (user edits)
-  notifications   ⏭  up to date
+  auth-service    re-indexed (code drift detected)
+  payments        frontmatter ingested (user edits)
+  notifications   up to date
 
 Registry updated: .repo-orchestrator/registry.json
 ```
