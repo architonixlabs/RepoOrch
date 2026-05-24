@@ -323,6 +323,12 @@ your-workspace/
 
 ## Changelog
 
+### v0.2.2
+
+- **Command renaming** — all commands now use the `repo-orch-` prefix for clear identification: `/repo-orch-setup`, `/repo-orch-init`, `/repo-orch-triage`, `/repo-orch-deliberate`, `/repo-orch-sync`, `/repo-orch-edit`, `/repo-orch-graph`
+- All internal cross-references between commands updated
+- Markdown lint warnings resolved across all command files
+
 ### v0.2.1
 
 - **`/repo-orch-setup` command** — interactive installer that checks all prerequisites before bootstrapping
