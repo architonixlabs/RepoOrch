@@ -2,7 +2,7 @@
 
 > A Claude Code plugin that turns a multi-repo microservice project into a coordinated team of AI agents that **propose** (never apply) consolidated change plans.
 
-[![Validate Plugin](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml/badge.svg)](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml)
+[![Validate Plugin](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.2.4-blue.svg)](.claude-plugin/plugin.json)
 
