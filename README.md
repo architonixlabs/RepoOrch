@@ -2,7 +2,7 @@
 
 > A Claude Code plugin that turns a multi-repo microservice project into a coordinated team of AI agents that **propose** (never apply) consolidated change plans.
 
-[![Validate Plugin](https://github.com/Architonix/RepoOrch/actions/workflows/validate.yml/badge.svg)](https://github.com/Architonix/RepoOrch/actions/workflows/validate.yml)
+[![Validate Plugin](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml/badge.svg)](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](.claude-plugin/plugin.json)
 
@@ -32,7 +32,7 @@ Regular subagents can only report to their caller. **Agent Teams** (Claude Code 
 ## Prerequisites
 
 | Requirement | Detail |
-|---|---|
+| --- | --- |
 | **Claude Code** | v2.1.32 or later |
 | **Agent Teams** | Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (see workspace setup) |
 | **Node.js 18+** | Optional — only needed for the Tier-1 indexer and MCP server. The core Tier-0 path works without it. |
@@ -44,7 +44,7 @@ Regular subagents can only report to their caller. **Agent Teams** (Claude Code 
 
 ```bash
 # Add the marketplace (one time)
-/plugin marketplace add Architonix/RepoOrch
+/plugin marketplace add architonixlabs/RepoOrch
 
 # Install the plugin
 /plugin install repo-orchestrator@repo-orchestrator-dev
@@ -56,7 +56,7 @@ Regular subagents can only report to their caller. **Agent Teams** (Claude Code 
 
 Your workspace should look like this:
 
-```
+```text
 my-project/          ← run `claude` here
 ├── auth-service/    ← a git repo (clone or submodule)
 ├── payments/
@@ -81,11 +81,12 @@ Or let `/init-context` create it for you (it will ask).
 
 ### 1 — Bootstrap (once per project)
 
-```
+```text
 /init-context
 ```
 
 What it does:
+
 1. Discovers all git repos under the workspace root
 2. Indexes each repo (language, frameworks, endpoints, events, dependencies)
 3. Builds knowledge graphs per repo if graphify is installed *(reduces future triage token cost)*
@@ -95,32 +96,32 @@ What it does:
 
 ### 2 — Triage a ticket
 
-```
+```text
 /triage "Users are getting 401 errors after the recent auth refactor"
 ```
 
 ### 3 — Root-cause an incident (adversarial mode)
 
-```
+```text
 /deliberate "Payments failing intermittently — unknown root cause"
 ```
 
 ### 4 — Edit a repo's context
 
-```
+```text
 /edit-context auth-service
 ```
 
 ### 5 — Refresh after code changes
 
-```
+```text
 /sync-context              # all repos
 /sync-context auth-service # one repo
 ```
 
 ### 6 — Build knowledge graphs (token-saving, optional)
 
-```
+```text
 /graph-context              # build graphs for all repos
 /graph-context auth-service # build graph for one repo
 /graph-context --rebuild    # force full rebuild after a major refactor
@@ -134,7 +135,7 @@ Graphs are stored in `.repo-orchestrator/graphs/<name>/graph.json`. Once built, 
 
 By default each `/triage` call has specialists cold-read source files for every ticket. The graphify integration changes this:
 
-```
+```text
 /graph-context  →  builds graph.json per repo (one-time cost)
      ↓
 /triage         →  master pre-queries each candidate's graph (1200-token budget)
@@ -178,7 +179,7 @@ The `/graph-context` integration is the primary lever for reducing ongoing token
 ## Optional tiers
 
 | Tier | What it adds | Requirement |
-|---|---|---|
+| --- | --- | --- |
 | **Tier 0** | All core functionality via prompt-driven skills | None |
 | **Tier 1 — Indexer** | Faster, deterministic extraction | Node.js 18+ |
 | **Tier 2 — MCP server** | Live registry tools for the master agent | Node.js 18+ |
@@ -242,7 +243,7 @@ Requires `@anthropic-ai/claude-agent-sdk` (`npm install @anthropic-ai/claude-age
 
 ## Project layout
 
-```
+```text
 repo-orchestrator/
 ├── .claude-plugin/
 │   ├── plugin.json
@@ -281,7 +282,7 @@ repo-orchestrator/
 
 The plugin generates these files **in your workspace** (not in the plugin directory):
 
-```
+```text
 your-workspace/
 ├── .repo-orchestrator/
 │   ├── registry.json               Master index of all repos

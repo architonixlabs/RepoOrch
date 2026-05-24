@@ -4,7 +4,7 @@
   "description": "Turns a multi-repo microservice project into a coordinated AI agent team that proposes (never applies) cross-repo change plans.",
   "author": "Architonix",
   "keywords": ["multi-repo", "microservices", "agent-teams", "orchestration", "planning"],
-  "repository": "https://github.com/Architonix/RepoOrch",
+  "repository": "https://github.com/architonixlabs/RepoOrch",
   "commands": [
     "commands/init-context.md",
     "commands/sync-context.md",
