@@ -13,6 +13,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Fetch full history so we can read the latest README from main
+          # even when the tag points to an earlier commit
+          fetch-depth: 0
+
+      - name: Read changelog from main branch
+        run: git show origin/main:README.md > README.md || true
 
       - name: Build Tier-1 indexer
         run: |
