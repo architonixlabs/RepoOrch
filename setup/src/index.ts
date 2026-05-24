@@ -315,7 +315,7 @@ const scanTasks = new Listr(
       task.title = chalk.dim(`       ${label}`);
     },
   })),
-  { concurrent: false, renderer: 'simple', rendererOptions: { collapseSubtasks: false } }
+  { concurrent: false, renderer: 'simple' }
 );
 
 await scanTasks.run().catch(() => { /* harmless — just display tasks */ });
@@ -360,7 +360,6 @@ if (pending.length > 0) {
       rendererOptions: {
         collapseSubtasks: false,
         collapseErrors: false,
-        showTimer: true,
       },
     }
   );
