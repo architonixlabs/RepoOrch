@@ -57,3 +57,13 @@ jobs:
           else
             echo "Tier-2 MCP server not present, skipping"
           fi
+
+      - name: Build setup runner (if present)
+        run: |
+          if [ -f setup/package.json ]; then
+            cd setup
+            npm install
+            npm run build
+          else
+            echo "Setup runner not present, skipping"
+          fi

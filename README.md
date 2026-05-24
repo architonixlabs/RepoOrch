@@ -197,9 +197,18 @@ The `/repo-orch-graph` integration is the primary lever for reducing ongoing tok
 | Tier | What it adds | Requirement |
 | --- | --- | --- |
 | **Tier 0** | All core functionality via prompt-driven skills | None |
+| **Setup runner** | Rich `listr2` UI for `/repo-orch-setup` (progress steps, spinners, color) | Node.js 18+ |
 | **Tier 1 — Indexer** | Faster, deterministic extraction | Node.js 18+ |
 | **Tier 2 — MCP server** | Live registry tools for the master agent | Node.js 18+ |
 | **graphify graphs** | Pre-built knowledge graphs that cut triage token cost | Python 3.10+ |
+
+### Build setup runner (rich UI)
+
+```bash
+cd setup && npm install && npm run build
+```
+
+The compiled runner is invoked automatically by `/repo-orch-setup` when it is present at `.claude/plugins/repo-orchestrator/setup/dist/index.js`. It uses `listr2` for live task-list progress and `chalk` for color output. Without it, the command falls back to plain text.
 
 ### Build Tier-1 indexer
 
@@ -281,6 +290,7 @@ repo-orchestrator/
 ├── schemas/
 │   ├── registry.schema.json        JSON Schema for registry.json
 │   └── context-template.md         Per-repo context file template
+├── setup/                          Setup runner — listr2 UI for /repo-orch-setup
 ├── indexer/                        Tier 1 — optional TypeScript indexer
 ├── mcp/                            Tier 2 — optional MCP server
 ├── automation/                     Agent SDK headless runner
