@@ -1,3 +1,8 @@
+---
+name: routing
+description: "Select which repo specialist agents to involve for a given ticket. Uses keyword scoring against each repo's owns, endpoints, emits, and consumes fields."
+---
+
 # Routing Skill
 
 Use this skill when the master controller needs to select which repo specialist agents to involve for a given ticket or incident description.

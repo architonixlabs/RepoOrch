@@ -1,3 +1,8 @@
+---
+name: repo-indexing
+description: "Scan a repository and produce structured context (languages, frameworks, endpoints, events, dependencies). Fallback when Tier-1 indexer is unavailable."
+---
+
 # Repo Indexing Skill (Tier 0)
 
 Use this skill when you need to scan a repository and produce structured context for it. This is the fallback when the Tier-1 indexer is unavailable.
