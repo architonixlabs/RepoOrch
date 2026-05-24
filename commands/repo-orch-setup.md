@@ -1,318 +1,445 @@
 ---
 name: repo-orch-setup
-description: "Interactive installer: checks all prerequisites (Claude Code version, Node.js, Python, graphify), offers to install missing ones, then runs /repo-orch-init to bootstrap the workspace."
+description: "First-time setup: runs a single prerequisite scan, shows a rich status dashboard, installs any missing optional components, then hands off to /repo-orch-init."
 ---
 
 # /repo-orch-setup
 
-Interactive first-time setup for repo-orchestrator. Run this once from your workspace root instead of running `/repo-orch-init` directly. It checks every prerequisite, tells you what is missing, offers to fix it, and only proceeds when the environment is ready.
+First-time setup for repo-orchestrator. Runs once from your workspace root — checks every prerequisite in one pass, shows you a clean status dashboard, installs optional components you choose, then bootstraps the workspace automatically.
 
 ---
 
-## Phase 1 — Welcome
+## Step 1 — Print the welcome banner
 
-Print this banner:
+Output exactly:
 
 ```text
-╔══════════════════════════════════════════════════════════╗
-║        repo-orchestrator  v0.2.1  — Setup               ║
-║     Interactive installer & prerequisite checker         ║
-╚══════════════════════════════════════════════════════════╝
-
-This wizard will:
-  1. Check all prerequisites
-  2. Offer to install anything that is missing
-  3. Bootstrap your workspace with /repo-orch-init
-
-Press Enter / reply "go" to begin, or "quit" to exit.
+╔══════════════════════════════════════════════════════════════╗
+║   repo-orchestrator  v0.2.4  ·  Setup & Installation         ║
+║   Checking your environment…                                 ║
+╚══════════════════════════════════════════════════════════════╝
 ```
-
-Wait for the user to reply before continuing.
 
 ---
 
-## Phase 2 — Prerequisite checks
+## Step 2 — Run all prerequisite checks in one Bash call
 
-Run each check below using Bash (inspection only). Print results as you go using the format:
-
-```text
-[✓] Requirement name — details
-[✗] Requirement name — what is missing
-[~] Requirement name — optional, not installed
-```
-
-### Check 1 — Claude Code version
+Execute the following script **as a single Bash tool call** (one permission prompt, no intermediate output shown to the user). Capture the output — do not stream it.
 
 ```bash
-claude --version 2>/dev/null || echo "NOT_FOUND"
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ── Claude Code version ──────────────────────────────────────
+cc_ver=$(claude --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
+if [ -z "$cc_ver" ]; then
+  cc_status="MISSING"
+  cc_detail="not found on PATH"
+elif printf '%s\n%s\n' "2.1.32" "$cc_ver" | sort -V -C 2>/dev/null && [ "$cc_ver" != "2.1.32" ]; then
+  # cc_ver > 2.1.32
+  cc_status="OK"
+  cc_detail="v$cc_ver"
+elif [ "$cc_ver" = "2.1.32" ]; then
+  cc_status="OK"
+  cc_detail="v$cc_ver"
+else
+  cc_status="OLD"
+  cc_detail="v$cc_ver (needs 2.1.32+)"
+fi
+
+# ── Agent Teams env var / settings.json ─────────────────────
+at_env=$(printenv CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 2>/dev/null || echo "")
+at_settings=""
+if [ -f ".claude/settings.json" ]; then
+  at_settings=$(grep -o '"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"[[:space:]]*:[[:space:]]*"1"' .claude/settings.json 2>/dev/null || echo "")
+fi
+if [ "$at_env" = "1" ] || [ -n "$at_settings" ]; then
+  at_status="OK"
+  at_detail="enabled"
+else
+  at_status="OPTIONAL"
+  at_detail="not set — multi-repo deliberation inactive"
+fi
+
+# ── Node.js ─────────────────────────────────────────────────
+node_ver=$(node --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
+if [ -z "$node_ver" ]; then
+  node_status="OPTIONAL"
+  node_detail="not installed (Tier-0 still works)"
+else
+  node_major=$(echo "$node_ver" | cut -d. -f1)
+  if [ "$node_major" -ge 18 ]; then
+    node_status="OK"
+    node_detail="v$node_ver"
+  else
+    node_status="OLD"
+    node_detail="v$node_ver (needs 18+ for Tier-1/2)"
+  fi
+fi
+
+# ── npm ──────────────────────────────────────────────────────
+if [ -n "$node_ver" ]; then
+  npm_ver=$(npm --version 2>/dev/null || echo "")
+  if [ -n "$npm_ver" ]; then
+    npm_status="OK"
+    npm_detail="v$npm_ver"
+  else
+    npm_status="MISSING"
+    npm_detail="not found (required alongside Node.js)"
+  fi
+else
+  npm_status="SKIP"
+  npm_detail="skipped (Node.js absent)"
+fi
+
+# ── Python ───────────────────────────────────────────────────
+py_cmd=""
+py_ver=""
+for cmd in python3 python; do
+  v=$($cmd --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
+  if [ -n "$v" ]; then py_cmd=$cmd; py_ver=$v; break; fi
+done
+if [ -z "$py_ver" ]; then
+  py_status="OPTIONAL"
+  py_detail="not installed (graphify unavailable)"
+else
+  py_major=$(echo "$py_ver" | cut -d. -f1)
+  py_minor=$(echo "$py_ver" | cut -d. -f2)
+  if [ "$py_major" -ge 3 ] && [ "$py_minor" -ge 10 ]; then
+    py_status="OK"
+    py_detail="v$py_ver"
+  else
+    py_status="OLD"
+    py_detail="v$py_ver (needs 3.10+ for graphify)"
+  fi
+fi
+
+# ── graphify ─────────────────────────────────────────────────
+gfy_ver=""
+if [ -n "$py_cmd" ]; then
+  gfy_ver=$($py_cmd -c "import graphifyy; print(getattr(graphifyy,'__version__','installed'))" 2>/dev/null || echo "")
+fi
+if [ -n "$gfy_ver" ]; then
+  gfy_status="OK"
+  gfy_detail="v$gfy_ver — knowledge graphs ready"
+elif [ -n "$py_cmd" ]; then
+  gfy_status="OPTIONAL"
+  gfy_detail="not installed (run /repo-orch-graph after setup)"
+else
+  gfy_status="SKIP"
+  gfy_detail="skipped (Python absent)"
+fi
+
+# ── uv ───────────────────────────────────────────────────────
+uv_ver=$(uv --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
+if [ -n "$uv_ver" ]; then
+  uv_status="OK"
+  uv_detail="v$uv_ver — preferred graphify installer"
+else
+  uv_status="OPTIONAL"
+  uv_detail="not installed (pip will be used instead)"
+fi
+
+# ── Tier-1 indexer ───────────────────────────────────────────
+plugin_dir="$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "$0")")")"
+t1_built=""
+if [ -f "$plugin_dir/indexer/dist/index.js" ] || [ -f ".claude/plugins/repo-orchestrator/indexer/dist/index.js" ]; then
+  t1_built="YES"
+fi
+if [ -n "$t1_built" ]; then
+  t1_status="OK"
+  t1_detail="built — fast deterministic indexing active"
+elif [ -n "$node_ver" ]; then
+  t1_status="OPTIONAL"
+  t1_detail="not built (Tier-0 fallback active)"
+else
+  t1_status="SKIP"
+  t1_detail="skipped (Node.js absent)"
+fi
+
+# ── Tier-2 MCP server ────────────────────────────────────────
+t2_built=""
+if [ -f "$plugin_dir/mcp/dist/server.js" ] || [ -f ".claude/plugins/repo-orchestrator/mcp/dist/server.js" ]; then
+  t2_built="YES"
+fi
+if [ -n "$t2_built" ]; then
+  t2_status="OK"
+  t2_detail="built — live registry tools available"
+elif [ -n "$node_ver" ]; then
+  t2_status="OPTIONAL"
+  t2_detail="not built (triage works without it)"
+else
+  t2_status="SKIP"
+  t2_detail="skipped (Node.js absent)"
+fi
+
+# ── Workspace layout ─────────────────────────────────────────
+git_count=0
+git_names=""
+for d in */; do
+  if [ -d "${d}.git" ]; then
+    git_count=$((git_count + 1))
+    git_names="$git_names ${d%/}"
+  fi
+done
+git_names="${git_names# }"
+if [ "$git_count" -ge 1 ]; then
+  ws_status="OK"
+  ws_detail="$git_count repo(s): $git_names"
+else
+  ws_status="MISSING"
+  ws_detail="no git repos found as immediate subdirectories"
+fi
+
+# ── Emit structured results ──────────────────────────────────
+cat <<EOF
+CC_STATUS=$cc_status
+CC_DETAIL=$cc_detail
+AT_STATUS=$at_status
+AT_DETAIL=$at_detail
+NODE_STATUS=$node_status
+NODE_DETAIL=$node_detail
+NPM_STATUS=$npm_status
+NPM_DETAIL=$npm_detail
+PY_STATUS=$py_status
+PY_DETAIL=$py_ver
+PY_CMD=$py_cmd
+GFY_STATUS=$gfy_status
+GFY_DETAIL=$gfy_detail
+UV_STATUS=$uv_status
+UV_DETAIL=$uv_detail
+T1_STATUS=$t1_status
+T1_DETAIL=$t1_detail
+T2_STATUS=$t2_status
+T2_DETAIL=$t2_detail
+WS_STATUS=$ws_status
+WS_DETAIL=$ws_detail
+WS_COUNT=$git_count
+EOF
 ```
 
-- Parse the version number (e.g., `2.1.35`).
-- **Required: 2.1.32 or later.**
-- If found and ≥ 2.1.32: `[✓] Claude Code v<version>`
-- If found but older: `[✗] Claude Code v<version> — needs 2.1.32+ for Agent Teams`
-- If not found: `[✗] Claude Code — not found on PATH`
-
-### Check 2 — Agent Teams environment variable
-
-```bash
-printenv CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 2>/dev/null || echo "NOT_SET"
-```
-
-Also check `.claude/settings.json` in the workspace root if it exists — look for `"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` in the `env` block.
-
-- If set to `"1"` in either place: `[✓] Agent Teams enabled`
-- If not set: `[~] Agent Teams — not enabled (will offer to create .claude/settings.json)`
-
-### Check 3 — Node.js
-
-```bash
-node --version 2>/dev/null || echo "NOT_FOUND"
-```
-
-- **Required: 18.0.0 or later** (for Tier-1 indexer and Tier-2 MCP server).
-- If found and ≥ 18: `[✓] Node.js v<version>`
-- If found but older: `[✗] Node.js v<version> — needs 18+ for Tier-1/2 features`
-- If not found: `[~] Node.js — not installed (Tier-0 core features will still work)`
-
-### Check 4 — npm
-
-```bash
-npm --version 2>/dev/null || echo "NOT_FOUND"
-```
-
-- Only relevant if Node.js is present.
-- If found: `[✓] npm v<version>`
-- If not found and Node.js is present: `[✗] npm — not found (required alongside Node.js)`
-- If Node.js is also absent: skip this check.
-
-### Check 5 — Python
-
-Try each in order, stopping at the first hit:
-
-```bash
-python3 --version 2>/dev/null || python --version 2>/dev/null || echo "NOT_FOUND"
-```
-
-- **Required: 3.10 or later** for graphify.
-- If found and ≥ 3.10: `[✓] Python v<version>`
-- If found but older: `[~] Python v<version> — needs 3.10+ for graphify (optional)`
-- If not found: `[~] Python — not installed (graphify token-saving feature unavailable)`
-
-### Check 6 — graphify
-
-```bash
-python3 -c "import graphify; print(graphify.__version__)" 2>/dev/null \
-  || python -c "import graphify; print(graphify.__version__)" 2>/dev/null \
-  || echo "NOT_FOUND"
-```
-
-Also try: `python3 -m graphify --version 2>/dev/null || echo "NOT_FOUND"`
-
-- If found: `[✓] graphify v<version> — knowledge graphs available`
-- If not found and Python is present: `[~] graphify — not installed (optional, saves tokens on /repo-orch-triage)`
-- If Python absent: `[~] graphify — skipped (Python not available)`
-
-### Check 7 — uv (optional installer)
-
-```bash
-uv --version 2>/dev/null || echo "NOT_FOUND"
-```
-
-- If found: `[✓] uv v<version> — preferred installer for graphify`
-- If not found: `[~] uv — not installed (will fall back to pip for graphify)`
-
-### Check 8 — Workspace layout
-
-List immediate subdirectories of the current directory. Count how many contain a `.git` directory.
-
-- If ≥ 1 git repos found: `[✓] Workspace — found <N> git repo(s) as immediate subdirectories`
-- If 0 found: `[✗] Workspace — no git repositories found as immediate subdirectories`
-  - Add a note: "Expected layout: each microservice is a subdirectory of the current directory. Run `claude` from the parent directory that contains all your service repos."
+Parse each `KEY=value` line from the output into variables.
 
 ---
 
-## Phase 3 — Summary and blockers
+## Step 3 — Render the status dashboard
 
-After all checks, print a categorized summary:
+Using the parsed variables, print the following dashboard. Never show raw command output — only the formatted table below.
 
-```text
-─────────────────────────────────────────
-  REQUIRED (must fix before continuing)
-─────────────────────────────────────────
-  [list any ✗ items here, or "None — all required items pass ✓"]
+Map status codes to icons:
 
-─────────────────────────────────────────
-  OPTIONAL (recommended but not required)
-─────────────────────────────────────────
-  [list any ~ items here, or "None"]
-─────────────────────────────────────────
-```
-
-**If there are any ✗ (required) failures:**
-
-Do NOT proceed to Phase 4. Instead, for each failure offer a specific fix:
-
-### Workspace layout failure
+- `OK` → `✓`
+- `OPTIONAL` → `○`
+- `SKIP` → `─`
+- `MISSING` / `OLD` → `✗`
 
 ```text
-⚠️  No git repos found. Please cd into your workspace root (the directory that
-    contains all your service repos) and run /repo-orch-setup again.
+  Environment Check
+  ─────────────────────────────────────────────────────────────
+  Component              Status   Detail
+  ─────────────────────────────────────────────────────────────
+  Claude Code            <icon>   <CC_DETAIL>
+  Agent Teams            <icon>   <AT_DETAIL>
+  ─────────────────────────────────────────────────────────────
+  Node.js                <icon>   <NODE_DETAIL>
+  npm                    <icon>   <NPM_DETAIL>
+  ─────────────────────────────────────────────────────────────
+  Python                 <icon>   <PY_DETAIL or py_detail>
+  graphify               <icon>   <GFY_DETAIL>
+  uv                     <icon>   <UV_DETAIL>
+  ─────────────────────────────────────────────────────────────
+  Tier-1 indexer         <icon>   <T1_DETAIL>
+  Tier-2 MCP server      <icon>   <T2_DETAIL>
+  ─────────────────────────────────────────────────────────────
+  Workspace layout       <icon>   <WS_DETAIL>
+  ─────────────────────────────────────────────────────────────
 
-    Example:
-      cd ~/my-project    ← contains auth-service/, payments/, etc.
-      /repo-orch-setup
+  Legend:  ✓ ready   ○ optional / not set   ─ skipped   ✗ action needed
 ```
-
-Stop here and wait for the user.
-
-### Claude Code version failure
-
-```text
-⚠️  Please upgrade Claude Code:
-      npm update -g @anthropic-ai/claude-code
-    Then restart this session and run /repo-orch-setup again.
-```
-
-Stop here and wait for the user.
-
-### Node.js failure (if Tier-1 features were requested)
-
-Only block if the user explicitly needs Tier-1/2 features. Tier-0 (prompt-only) works without Node.js — offer to continue with Tier-0 only.
 
 ---
 
-## Phase 4 — Offer to fix optional items
+## Step 4 — Handle blockers
 
-For each `[~]` item, ask the user if they want it installed. Ask all optional questions in one grouped message — do not ask one at a time.
-
-```text
-Optional enhancements available:
-
-  A) Agent Teams (.claude/settings.json)  — enables multi-repo deliberation  [recommended]
-  B) graphify                             — reduces /repo-orch-triage cost    [recommended if Python present]
-  C) Tier-1 indexer (npm run build)       — faster, deterministic indexing    [optional, needs Node.js]
-  D) Tier-2 MCP server (npm run build)    — live registry tools               [optional, needs Node.js]
-
-Which would you like to set up? (e.g. "A B" or "all" or "none")
-```
-
-Wait for the user's reply.
-
-### If A — Agent Teams
-
-Check if `.claude/settings.json` exists:
-
-- If it exists, read it and add `"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` to the `env` block (merge carefully — do not overwrite existing keys).
-- If it does not exist, create it:
-
-```json
-{
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-  },
-  "experimental": {
-    "teammateMode": true
-  }
-}
-```
-
-Print: `[✓] Created .claude/settings.json — Agent Teams enabled`
-
-### If B — graphify
-
-Detect the best installer:
-
-1. If `uv` is available: `uv tool install graphifyy`
-2. Else if `pip3` is available: `pip3 install graphifyy`
-3. Else if `pip` is available: `pip install graphifyy`
-4. Else: print install instructions and skip
-
-Run the detected command via Bash. If it succeeds:
+**If `WS_STATUS` is `MISSING`:** Stop immediately and print:
 
 ```text
-[✓] graphify installed — run /repo-orch-graph after setup to build knowledge graphs
+  ✗  No git repositories found in this directory.
+
+     repo-orchestrator expects each microservice to be an immediate
+     subdirectory with its own .git folder:
+
+       my-project/         ← run /repo-orch-setup here
+       ├── auth-service/   ← git repo
+       ├── payments/       ← git repo
+       └── notifications/  ← git repo
+
+     Please cd into your workspace root and run /repo-orch-setup again.
 ```
 
-If it fails, print the raw error and say:
+Do not continue.
+
+**If `CC_STATUS` is `MISSING` or `OLD`:** Print a warning but do not block — Claude Code is already running so the check is informational. Note in the dashboard output that Agent Teams requires v2.1.32+.
+
+---
+
+## Step 5 — Install optional components (no confirmation prompts)
+
+For each optional item that is not already `OK`, check if it is installable and install it silently. Show a one-line progress indicator before each install and a one-line result after. Do not ask the user which items to install — install everything that can be installed automatically.
+
+Print this section header first:
 
 ```text
-[✗] graphify install failed. You can try manually:
-      pip install graphifyy
-    Then run /repo-orch-graph once you're set up.
+  Installing optional components…
+  ──────────────────────────────────────────────────────────────
 ```
 
-### If C — Build Tier-1 indexer
+### A — Agent Teams settings file
+
+If `AT_STATUS` is not `OK`:
+
+Run as a single Bash call (do not show output):
 
 ```bash
-cd indexer && npm install && npm run build && cd ..
+mkdir -p .claude
+if [ -f ".claude/settings.json" ]; then
+  # Merge: add env block if missing, add key if env block exists
+  node -e "
+    const fs=require('fs');
+    const p='.claude/settings.json';
+    let cfg={};
+    try{cfg=JSON.parse(fs.readFileSync(p,'utf8'));}catch(e){}
+    cfg.env=cfg.env||{};
+    cfg.env['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS']='1';
+    cfg.experimental=cfg.experimental||{};
+    cfg.experimental.teammateMode=true;
+    fs.writeFileSync(p,JSON.stringify(cfg,null,2)+'\n');
+  " 2>/dev/null || python3 -c "
+import json,os
+p='.claude/settings.json'
+cfg={}
+try:
+  with open(p) as f: cfg=json.load(f)
+except: pass
+cfg.setdefault('env',{})['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS']='1'
+cfg.setdefault('experimental',{})['teammateMode']=True
+with open(p,'w') as f: json.dump(cfg,f,indent=2); f.write('\n')
+" 2>/dev/null || echo '{"env":{"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS":"1"},"experimental":{"teammateMode":true}}' > .claude/settings.json
+else
+  echo '{"env":{"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS":"1"},"experimental":{"teammateMode":true}}' > .claude/settings.json
+fi
+echo "DONE"
 ```
 
-If it succeeds: `[✓] Tier-1 indexer built — /repo-orch-init will use it automatically`
+Print:
 
-If it fails: print the error and note that Tier-0 fallback will be used.
+- Before: `○ Agent Teams → writing .claude/settings.json…`
+- After (if output is `DONE`): `✓ Agent Teams enabled — restart Claude Code for this to take effect`
+- After (if failed): `✗ Agent Teams — could not write .claude/settings.json (check permissions)`
 
-### If D — Build Tier-2 MCP server
+### B — graphify
+
+If `GFY_STATUS` is `OPTIONAL` (Python is present but graphify is not installed):
+
+Print before: `○ graphify → installing via <uv/pip3/pip>…`
+
+Run as a single Bash call:
 
 ```bash
-cd mcp && npm install && npm run build && cd ..
+if command -v uv >/dev/null 2>&1; then
+  uv tool install graphifyy >/dev/null 2>&1 && echo "OK:uv" || echo "FAIL"
+elif command -v pip3 >/dev/null 2>&1; then
+  pip3 install --quiet graphifyy 2>/dev/null && echo "OK:pip3" || echo "FAIL"
+elif command -v pip >/dev/null 2>&1; then
+  pip install --quiet graphifyy 2>/dev/null && echo "OK:pip" || echo "FAIL"
+else
+  echo "NO_PIP"
+fi
 ```
 
-If it succeeds:
+- `OK:*` → `✓ graphify installed — run /repo-orch-graph after setup to build knowledge graphs`
+- `FAIL` → `✗ graphify install failed — try: pip install graphifyy`
+- `NO_PIP` → `○ graphify — no pip found; try: pip install graphifyy`
 
-```text
-[✓] Tier-2 MCP server built
+### C — Tier-1 indexer
 
-    To activate it, add this to your workspace .claude/settings.json:
+If `T1_STATUS` is `OPTIONAL` (Node.js is present but indexer is not built):
 
-      "mcpServers": {
-        "repo-orchestrator": {
-          "command": "node",
-          "args": [".claude/plugins/repo-orchestrator/mcp/dist/server.js"]
-        }
-      }
+Find the plugin directory. It will be at `.claude/plugins/repo-orchestrator/` relative to the workspace root if installed there, or use the path from which this command is running.
+
+Print before: `○ Tier-1 indexer → building…`
+
+Run as a single Bash call:
+
+```bash
+plugin_path=".claude/plugins/repo-orchestrator"
+if [ -d "$plugin_path/indexer" ]; then
+  cd "$plugin_path/indexer" && npm install --silent 2>/dev/null && npm run build --silent 2>/dev/null && echo "OK" || echo "FAIL"
+else
+  echo "NOT_FOUND"
+fi
 ```
 
-If it fails: print the error and note that Tier-0 + Tier-1 still work.
+- `OK` → `✓ Tier-1 indexer built — /repo-orch-init will use it automatically`
+- `FAIL` → `✗ Tier-1 indexer build failed — Tier-0 fallback will be used`
+- `NOT_FOUND` → `○ Tier-1 indexer — plugin path not found; skipping`
+
+### D — Tier-2 MCP server
+
+If `T2_STATUS` is `OPTIONAL` (Node.js is present but MCP server is not built):
+
+Print before: `○ Tier-2 MCP server → building…`
+
+Run as a single Bash call:
+
+```bash
+plugin_path=".claude/plugins/repo-orchestrator"
+if [ -d "$plugin_path/mcp" ]; then
+  cd "$plugin_path/mcp" && npm install --silent 2>/dev/null && npm run build --silent 2>/dev/null && echo "OK" || echo "FAIL"
+else
+  echo "NOT_FOUND"
+fi
+```
+
+- `OK` → print:
+
+  ```text
+  ✓  Tier-2 MCP server built
+
+     Add this to your workspace .claude/settings.json under "mcpServers":
+       "repo-orchestrator": {
+         "command": "node",
+         "args": [".claude/plugins/repo-orchestrator/mcp/dist/server.js"]
+       }
+  ```
+
+- `FAIL` → `✗ MCP server build failed — triage works without it`
+- `NOT_FOUND` → `○ Tier-2 MCP server — plugin path not found; skipping`
+
+If all optional items were already `OK` or `SKIP`, omit this section entirely and skip to Step 6.
 
 ---
 
-## Phase 5 — Pre-flight confirmation
+## Step 6 — Print the readiness summary
 
-Print a final readiness summary before proceeding to bootstrap:
+After installs (or if nothing needed installing), print:
 
 ```text
-─────────────────────────────────────────
-  READY TO BOOTSTRAP
-─────────────────────────────────────────
+  ──────────────────────────────────────────────────────────────
+  Ready
+  ──────────────────────────────────────────────────────────────
+  Workspace   <absolute path of current directory>
+  Repos       <WS_COUNT> detected: <comma-separated names>
+  Agent Teams <enabled / not enabled — restart Claude Code>
+  graphify    <available — run /repo-orch-graph to build graphs / not available>
+  Indexer     <Tier-1 active / Tier-0 fallback>
 
-  Workspace:      <absolute path>
-  Repos found:    <N> (<names>)
-  Agent Teams:    <enabled / not enabled>
-  graphify:       <available / not available>
-  Tier-1 indexer: <built / not built — Tier-0 fallback>
-  Tier-2 MCP:     <built / not built>
-
-  Next: /repo-orch-init will discover your repos, index them,
-  write editable context files, and pause for your review
-  before generating specialist agents.
-
-  Ready to continue? [y/N]
+  Starting /repo-orch-init…
+  ──────────────────────────────────────────────────────────────
 ```
-
-Wait for the user's reply. If "y" / "yes" / "go" / affirmative → proceed to Phase 6.
-
-If "n" / "no" / "quit" → print "Setup paused. Run /repo-orch-setup again when ready." and stop.
 
 ---
 
-## Phase 6 — Run /repo-orch-init
+## Step 7 — Run /repo-orch-init
 
-Invoke the `/repo-orch-init` command directly (do not spawn a subagent — execute it inline as part of this session). It will handle all remaining steps: repo discovery, indexing, graphify graph building (if available), context document review, and agent registration.
-
-Before invoking, print:
-
-```text
-▶ Starting /repo-orch-init...
-──────────────────────────────
-```
+Invoke `/repo-orch-init` immediately — no confirmation prompt, no "Ready to continue?" gate. It will handle: repo discovery, indexing, context document generation, review pause, and agent registration.

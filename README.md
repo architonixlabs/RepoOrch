@@ -4,7 +4,7 @@
 
 [![Validate Plugin](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml/badge.svg)](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.2.4-blue.svg)](.claude-plugin/plugin.json)
 
 ---
 
@@ -322,6 +322,10 @@ your-workspace/
 ---
 
 ## Changelog
+
+### v0.2.4
+
+- **`/repo-orch-setup` overhaul** — all prerequisite checks now run in a single Bash script (one permission prompt instead of eight); raw command output is fully suppressed; UI replaced with a clean formatted status dashboard (icons, aligned table, section dividers); optional component installs run silently with before/after status lines; confirmation gates removed — setup proceeds automatically after checks pass
 
 ### v0.2.3
 
