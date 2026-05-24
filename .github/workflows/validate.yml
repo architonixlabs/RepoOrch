@@ -41,7 +41,7 @@ jobs:
         run: |
           if [ -f indexer/package.json ]; then
             cd indexer
-            npm ci
+            npm install
             npm run build
             npm run lint || true
           else
@@ -52,7 +52,7 @@ jobs:
         run: |
           if [ -f mcp/package.json ]; then
             cd mcp
-            npm ci
+            npm install
             npm run build
           else
             echo "Tier-2 MCP server not present, skipping"
