@@ -1,4 +1,9 @@
 {
+  "name": "repo-orchestrator",
+  "owner": {
+    "name": "Architonix",
+    "url": "https://github.com/architonixlabs"
+  },
   "plugins": [
     {
       "name": "repo-orchestrator",
