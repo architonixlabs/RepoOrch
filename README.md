@@ -67,19 +67,35 @@ my-project/          ← run `claude` here
 
 All service repos are **immediate subdirectories of the root**. This is the layout the plugin expects by default — no configuration needed.
 
-Enable Agent Teams by copying the example settings file to your workspace root:
-
-```bash
-cp .claude/plugins/repo-orchestrator/examples/workspace-template/.claude/settings.json .claude/settings.json
-```
-
-Or let `/init-context` create it for you (it will ask).
-
 ---
 
 ## Usage
 
-### 1 — Bootstrap (once per project)
+### 1 — Interactive setup (recommended first-time path)
+
+```text
+/setup
+```
+
+An interactive wizard that:
+
+1. Checks all prerequisites (Claude Code version, Node.js, Python, graphify)
+2. Shows a pass/fail table — required items block progress, optional items are offered as installs
+3. Offers to enable Agent Teams, install graphify, and build the Tier-1/2 components
+4. Prints a readiness summary, then hands off to `/init-context` automatically
+
+**Prerequisite checks:**
+
+| Check | Required | What it verifies |
+| --- | --- | --- |
+| Claude Code ≥ 2.1.32 | Yes | Agent Teams support |
+| Workspace layout | Yes | At least one git repo as an immediate subdirectory |
+| Node.js ≥ 18 | No | Tier-1 indexer + Tier-2 MCP server |
+| Python ≥ 3.10 | No | graphify knowledge graphs |
+| graphify | No | Pre-built graphs for token savings |
+| Agent Teams env var | No | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` |
+
+### 2 — Bootstrap only (skip the wizard)
 
 ```text
 /init-context
@@ -94,32 +110,32 @@ What it does:
 5. You edit the context files (especially `owns` — this drives routing)
 6. You confirm → specialist agents and `registry.json` are written
 
-### 2 — Triage a ticket
+### 3 — Triage a ticket
 
 ```text
 /triage "Users are getting 401 errors after the recent auth refactor"
 ```
 
-### 3 — Root-cause an incident (adversarial mode)
+### 4 — Root-cause an incident (adversarial mode)
 
 ```text
 /deliberate "Payments failing intermittently — unknown root cause"
 ```
 
-### 4 — Edit a repo's context
+### 5 — Edit a repo's context
 
 ```text
 /edit-context auth-service
 ```
 
-### 5 — Refresh after code changes
+### 6 — Refresh after code changes
 
 ```text
 /sync-context              # all repos
 /sync-context auth-service # one repo
 ```
 
-### 6 — Build knowledge graphs (token-saving, optional)
+### 7 — Build knowledge graphs (token-saving, optional)
 
 ```text
 /graph-context              # build graphs for all repos
@@ -254,6 +270,7 @@ repo-orchestrator/
 ├── agents/
 │   └── repo-specialist-template.md Per-repo specialist (graph-first startup)
 ├── commands/
+│   ├── setup.md                    Interactive installer + prerequisite checker
 │   ├── init-context.md             Bootstrap: discover → index → graph → pause → register
 │   ├── sync-context.md             Drift detection + incremental graph update
 │   ├── edit-context.md             Guided context editing

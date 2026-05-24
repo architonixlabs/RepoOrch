@@ -6,6 +6,7 @@
   "keywords": ["multi-repo", "microservices", "agent-teams", "orchestration", "planning"],
   "repository": "https://github.com/architonixlabs/RepoOrch",
   "commands": [
+    "commands/setup.md",
     "commands/init-context.md",
     "commands/sync-context.md",
     "commands/edit-context.md",
