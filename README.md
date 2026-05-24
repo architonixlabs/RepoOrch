@@ -323,6 +323,16 @@ your-workspace/
 
 ## Changelog
 
+### v0.2.1
+
+- **`/setup` command** — interactive installer that checks all prerequisites before bootstrapping
+  - Verifies Claude Code ≥ 2.1.32, workspace layout, Node.js ≥ 18, Python ≥ 3.10
+  - Detects and reports optional components: graphify, uv, Tier-1 indexer, Tier-2 MCP server
+  - Offers to fix missing optional items (install graphify, build tiers, create Agent Teams settings)
+  - Prints a readiness summary then hands off to `/init-context` automatically
+- SessionStart hook updated to suggest `/setup` for first-time users
+- Automated release workflow now extracts changelog notes per version tag
+
 ### v0.2.0
 
 - **graphify integration** — `/graph-context` command builds per-repo knowledge graphs; `/triage` pre-queries them before spawning specialists; `/sync-context` incrementally updates graphs on drift; specialists read graph summary first and use targeted file reads only for gaps
