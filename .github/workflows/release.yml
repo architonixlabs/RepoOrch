@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Tier-1 indexer
+        run: |
+          if [ -f indexer/package.json ]; then
+            cd indexer && npm install && npm run build
+          fi
+
+      - name: Build Tier-2 MCP server
+        run: |
+          if [ -f mcp/package.json ]; then
+            cd mcp && npm install && npm run build
+          fi
+
+      - name: Create release archive
+        run: |
+          TAG=${GITHUB_REF_NAME}
+          ARCHIVE="repo-orchestrator-${TAG}"
+
+          # Create clean staging directory
+          mkdir -p "dist/${ARCHIVE}"
+
+          # Copy plugin files (exclude dev artifacts)
+          rsync -a \
+            --exclude='.git' \
+            --exclude='dist/' \
+            --exclude='node_modules/' \
+            --exclude='indexer/node_modules/' \
+            --exclude='mcp/node_modules/' \
+            --exclude='automation/node_modules/' \
+            --exclude='*.log' \
+            --exclude='SPEC.md' \
+            --exclude='docs/superpowers/' \
+            . "dist/${ARCHIVE}/"
+
+          # Copy built artifacts if they exist
+          if [ -d indexer/dist ]; then
+            cp -r indexer/dist "dist/${ARCHIVE}/indexer/dist"
+          fi
+          if [ -d mcp/dist ]; then
+            cp -r mcp/dist "dist/${ARCHIVE}/mcp/dist"
+          fi
+
+          cd dist
+          tar -czf "${ARCHIVE}.tar.gz" "${ARCHIVE}"
+          zip -r "${ARCHIVE}.zip" "${ARCHIVE}"
+
+          echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
+
+      - name: Extract changelog entry
+        id: changelog
+        run: |
+          TAG=${GITHUB_REF_NAME}
+          VERSION=${TAG#v}
+          # Extract the section for this version from README changelog
+          NOTES=$(awk "/^### v${VERSION}/{found=1; next} found && /^### v/{exit} found{print}" README.md)
+          echo "NOTES<<EOF" >> $GITHUB_ENV
+          echo "${NOTES}" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "repo-orchestrator ${{ github.ref_name }}"
+          body: ${{ env.NOTES }}
+          files: |
+            dist/${{ env.ARCHIVE }}.tar.gz
+            dist/${{ env.ARCHIVE }}.zip
+          draft: false
+          prerelease: false
