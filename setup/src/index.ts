@@ -227,7 +227,7 @@ function buildInstallTasks(r: ScanResults, cwd: string) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-const VERSION = '0.2.9';
+const VERSION = '0.3.0';
 const cwd = process.cwd();
 
 // Banner

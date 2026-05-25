@@ -314,6 +314,8 @@ VALIDATION HINTS:
 
 ---
 
-## PreToolUse hook (optional — for teams requiring strict enforcement)
+## PreToolUse hook
 
-To hard-block write-like Bash commands workspace-wide, add a project-scoped `PreToolUse` hook in `.claude/settings.json` that rejects `tool_input.command` matching: `rm`, `mv`, `cp`, `sed -i`, `tee`, `git commit`, `git push`, `git add`, `git reset`, `git checkout --`, `truncate`, `write`.
+A `PreToolUse` hook is installed by the plugin in `hooks/hooks.json` and blocks write-like Bash commands (`rm`, `mv`, `sed -i`, `tee`, `git commit`, `git push`, `git add`, `git reset`, `git checkout --`, `truncate`, `mkdir`, `touch`, `write`) before they execute. This is a hard enforcement layer — it runs at the platform level regardless of what any agent instruction says. Read-only Bash commands (`git log`, `git diff`, `git show`, `git blame`, `ls`, `grep`) are not blocked.
+
+Note: read-only enforcement is provided jointly by the `tools` allowlist (`Read, Grep, Glob, Bash`) and this PreToolUse hook. The `permissionMode: "plan"` frontmatter field has no effect on plugin-provided agents per Claude Code platform design — do not rely on it.

@@ -11,6 +11,18 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const cmd=(JSON.parse(process.env.CLAUDE_TOOL_INPUT||'{}')).command||'';const banned=[/\\brm\\s/,/\\bmv\\s/,/\\bcp\\s.*-[^-]*r/i,/\\bsed\\s+-i/,/\\btee\\s/,/\\btruncate\\s/,/git\\s+commit/,/git\\s+push/,/git\\s+add/,/git\\s+reset/,/git\\s+checkout\\s+--/,/git\\s+clean/,/\\bchmod\\s/,/\\bchown\\s/,/\\bmkdir\\s/,/\\btouch\\s/,/\\bwrite\\b/i,/\\bnpx\\s+.*rm/,/>\\s*[^&]/];const hit=banned.find(r=>r.test(cmd));if(hit){process.stdout.write(JSON.stringify({decision:'block',reason:'repo-orchestrator safety: write-like command blocked in specialist/subagent context: '+cmd.slice(0,120)}));process.exit(0);}\"",
+            "async": false
+          }
+        ]
+      }
     ]
   }
 }

@@ -22,6 +22,33 @@ If a repo name was provided, find that entry. If not found, stop: "Repo `<name>`
 
 ---
 
+## Step 1.5 — Detect stale entries (full sync only)
+
+Skip this step when a specific repo name was provided.
+
+For each entry in the registry, check whether its `path` still exists on disk as a directory. If it does not:
+
+1. Flag it as stale and print:
+
+   ```text
+   ⚠️  Stale registry entry: '<name>' — path '<path>' no longer exists.
+      This repo may have been deleted or renamed.
+      Remove it? [y/N]
+   ```
+
+2. If the user says Y:
+   - Delete `.claude/agents/repo-<name>.md` if it exists.
+   - Delete `.repo-orchestrator/context/<name>.md` if it exists.
+   - Delete `.repo-orchestrator/skills/<name>.md` if it exists.
+   - Delete `.repo-orchestrator/graphs/<name>/` directory if it exists.
+   - Remove the entry from the registry object (do not write yet — the write happens in Step 5).
+
+3. If the user says N: leave the entry in place and continue. It will remain stale until removed manually or re-confirmed at the next sync.
+
+After processing all stale entries, continue with Step 2 for the remaining (non-stale) entries only.
+
+---
+
 ## Step 2 — Detect drift
 
 For each repo to process:
@@ -86,7 +113,16 @@ Also regenerate the per-repo skill file `.repo-orchestrator/skills/<name>.md` if
 
 ## Step 5 — Validate and save registry
 
-Validate the updated `registry.json` against `schemas/registry.schema.json`. Write it. Report:
+Before writing, create a backup:
+
+1. If `.repo-orchestrator/registry.json` exists, copy it to `.repo-orchestrator/registry.json.bak`.
+2. Validate the updated registry object against `schemas/registry.schema.json`. If validation fails, do NOT write the file — report the validation error and stop. The existing `registry.json` and the `.bak` are both intact.
+3. Write the validated registry to `.repo-orchestrator/registry.json`.
+4. On success, delete `registry.json.bak`.
+
+If the write is interrupted or fails, the `.bak` file remains as a recovery copy. If `registry.json` is missing or corrupt on any future read, instruct the user: "Registry is corrupt or missing. If `.repo-orchestrator/registry.json.bak` exists, copy it to `registry.json` to restore the last known good state, then run `/repo-orch-sync`."
+
+Report:
 
 ```text
 Sync complete.

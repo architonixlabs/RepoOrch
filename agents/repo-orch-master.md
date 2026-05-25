@@ -89,7 +89,21 @@ CONTRACT_VERIFY_REQUEST: <repo>/<file>:<line-range>
 Reason: <claim being verified>
 ```
 
-Read the requested file and line range (it is within the workspace root). Return the excerpt as:
+**Before reading anything, validate the request against these rules:**
+
+1. **Registered repo prefix only.** The `<repo>` segment must match a repo `name` in `registry.json`. If it does not, respond with:
+   `CONTRACT_VERIFY_DENIED: '<repo>' is not a registered repo — cannot read files outside registered repo paths.`
+
+2. **Blocked path patterns.** Reject any request whose file path matches any of the following (case-insensitive). Respond with `CONTRACT_VERIFY_DENIED: sensitive path blocked`:
+   - `.env`, `.env.*`, `*.env`
+   - `*.pem`, `*.key`, `*.crt`, `*.p12`, `*.pfx`
+   - `*secret*`, `*credential*`, `*password*`, `*token*` (filename only, not directory)
+   - `.claude/`, `.git/`, `node_modules/`
+   - Any path containing `..` (directory traversal)
+
+3. **Source files only.** The requested path must resolve to a file within `<registered-repo-path>/` — not to the workspace root, `.repo-orchestrator/`, or any plugin directory.
+
+If all checks pass, read the requested file and line range. Return the excerpt as:
 
 ```text
 CONTRACT_VERIFY_RESPONSE for <requesting-specialist>:
@@ -97,7 +111,7 @@ File: <repo>/<file>, lines <start>–<end>
 <excerpt>
 ```
 
-This is the only circumstance where the master reads source files during an active triage. Log each verify request and response in the TRIAGE REPORT under a `CONTRACT_VERIFICATIONS` subsection so the audit trail is visible.
+This is the only circumstance where the master reads source files during an active triage. Log each verify request (including denied ones) in the TRIAGE REPORT under a `CONTRACT_VERIFICATIONS` subsection so the audit trail is visible.
 
 ---
 
@@ -110,7 +124,7 @@ When synthesizing specialist reports into a CONSOLIDATED CHANGE PLAN:
 - **Promote risks**: collect all `[HIGH]` risks from specialist reports first, then `[MEDIUM]`, then `[LOW]`. Do not bury a HIGH risk below LOW ones.
 - **Incomplete reports**: if a spawned specialist did not return a report, add `[INCOMPLETE]` at every step that would touch their contracts — never silently omit them.
 - **Evidence gate**: do not include "no impact" or "not affected" claims in the final plan unless the specialist cited a file path and line number. Unsupported claims become `[UNRESOLVED — evidence required]` risks.
-- **Aggregate confidence**: simple average of remaining specialists' CONFIDENCE scores. If every remaining specialist is PARTIALLY_RESPONSIBLE, apply a 0.8× penalty.
+- **Aggregate confidence**: use the routing-weighted formula defined in `skills/routing/SKILL.md` Step 4 (canonical definition): `weighted_score(s) = CONFIDENCE(s) × ROUTING_CONFIDENCE(s) / 100; aggregate = sum(weighted_score) ÷ count`. Apply 0.8× penalty if every remaining specialist is PARTIALLY_RESPONSIBLE.
 
 ---
 

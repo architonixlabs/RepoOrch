@@ -4,7 +4,7 @@
 
 [![Validate Plugin](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.9-blue.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](.claude-plugin/plugin.json)
 
 ---
 
@@ -328,6 +328,21 @@ your-workspace/
 ---
 
 ## Changelog
+
+### v0.3.0
+
+**Security hardening and reliability (10 fixes):**
+
+- **Prompt injection guard** — indexing skill and graph subagent now treat all file content as data, not instructions; instruction-like patterns stripped and replaced with `[REDACTED — suspicious content]`; field values capped at 200 characters
+- **PreToolUse write-blocking hook installed** — `hooks/hooks.json` now contains a real `PreToolUse` hook that hard-blocks write-like Bash commands (`rm`, `mv`, `git commit`, `git push`, `sed -i`, `>` redirection, etc.) at the platform level; the propose-only guarantee no longer relies solely on prose instructions
+- **Ticket text sanitization** — `/repo-orch-triage` and `/repo-orch-deliberate` now sanitize ticket/incident text in Step 0 before routing; instruction-like patterns stripped, length capped at 2000 chars; sanitized text used everywhere downstream
+- **CONTRACT_VERIFY_REQUEST path allowlist** — master agent validates all cross-repo read requests against registered repo names and blocks sensitive file patterns (`.env*`, `*.pem`, `*.key`, `*secret*`, `*credential*`, `*password*`, `*token*`, `.claude/`, `..` traversal); previously any workspace file could be read on behalf of a specialist
+- **Canonical aggregate confidence formula** — defined once in `skills/routing/SKILL.md` Step 4 as the single source of truth; master agent synthesis rules reference it instead of duplicating a divergent formula
+- **Registry backup-validate-write pattern** — both `/repo-orch-init` and `/repo-orch-sync` now copy registry to `.bak`, validate against schema, write, then delete `.bak`; includes recovery instructions if registry is corrupt on future reads
+- **Stale entry detection** — `/repo-orch-sync` Step 1.5 detects registry entries whose `path` no longer exists on disk, prompts user to remove them, and cleans up all associated agent/context/skill/graph files
+- **Graph subagent tool restriction** — `tools: Read, Grep, Glob, Bash` passed as machine-enforced parameter when spawning graph subagents; restriction is platform-enforced, not relying on prose instructions alone
+- **Shallow clone / detached HEAD detection** — `/repo-orch-graph` now probes git state with three commands before SHA comparison; forces full rebuild and prints a clear message if shallow clone or detached HEAD is detected; prevents incorrect incremental skip in CI environments
+- **Trimmed candidate visibility** — when routing cap trims candidates beyond 5, the warning now names each dropped repo with its score; each dropped repo gets an `[UNCOVERED — routing cap applied]` entry in the consolidated plan RISKS section
 
 ### v0.2.9
 

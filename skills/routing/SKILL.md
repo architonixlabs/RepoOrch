@@ -135,6 +135,23 @@ routingConfidence = (topScore / (topScore + secondScore + 1)) × 100  (integer p
 
 If only 1 candidate has score > 0, routingConfidence = 100. If 0 candidates, routingConfidence = 0.
 
+### Aggregate confidence formula (canonical definition)
+
+This formula is used by both `/repo-orch-triage` and the master agent when synthesising specialist reports. It is defined here as the single source of truth:
+
+```
+weighted_score(s) = CONFIDENCE(s) × ROUTING_CONFIDENCE(s) / 100
+aggregate = sum(weighted_score) ÷ count(remaining specialists)
+```
+
+Where:
+- `CONFIDENCE(s)` is the 0–100 confidence the specialist reported in its verdict
+- `ROUTING_CONFIDENCE(s)` is the routing confidence score assigned to that specialist when they were selected (from the ROUTING CONTEXT block)
+- "remaining specialists" excludes any specialist dropped as NOT_RESPONSIBLE with confidence ≥ 80%
+- If every remaining specialist is PARTIALLY_RESPONSIBLE, apply an additional 0.8× penalty to the aggregate
+
+Both triage and master must use this formula. The "simple average" shorthand in the master agent's synthesis rules is superseded by this definition.
+
 **Single-repo shortcut:** If routingConfidence ≥ 80% and only one candidate is meaningfully ahead (gap ≥ 4 points from second), pass this directly to the master for single-subagent dispatch.
 
 **Zero candidates:** Report: "No responsible repo identified — ticket keywords did not match any `owns` fields. Check `.repo-orchestrator/registry.json` or run `/repo-orch-edit` to add keywords."

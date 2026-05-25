@@ -197,7 +197,13 @@ Read current values from the context file frontmatter (the user may have edited 
 
 ### 5d — Write / update `registry.json`
 
-For each repo, upsert the entry in `.repo-orchestrator/registry.json`. Structure per `schemas/registry.schema.json`. Set `lastIndexed` to the current ISO8601 timestamp. Set `userEdited: false`. Validate before saving.
+For each repo, upsert the entry in `.repo-orchestrator/registry.json`. Structure per `schemas/registry.schema.json`. Set `lastIndexed` to the current ISO8601 timestamp. Set `userEdited: false`.
+
+Before writing:
+
+1. If `registry.json` already exists, copy it to `registry.json.bak` first.
+2. Validate the full registry against `schemas/registry.schema.json`. If validation fails, do not write — report the error and stop. The existing files are intact.
+3. Write the validated registry, then delete `registry.json.bak`.
 
 ### 5e — Ensure `.claude/settings.json` has Agent Teams enabled
 
