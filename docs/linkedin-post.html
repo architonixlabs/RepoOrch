@@ -317,7 +317,46 @@
       </div>
     </div>
   </section>
-  <!-- diagram-3-layers -->
+  <!-- DIAGRAM 3: KNOWLEDGE LAYERS -->
+  <section class="section">
+    <div class="label">Diagram 3</div>
+    <div class="diagram-title">How Deep Each Agent Reads Its Repo</div>
+    <div class="layer-row">
+      <div class="layer-num" style="background:#4f46e5">1</div>
+      <div class="layer-content" style="background:#ede9fe">
+        <strong style="color:#4f46e5">Service Registry</strong>
+        <p>Purpose, owners, API version, what it deprecates. The "who is this service" layer.</p>
+      </div>
+    </div>
+    <div class="layer-row">
+      <div class="layer-num" style="background:#0ea5e9">2</div>
+      <div class="layer-content" style="background:#e0f2fe">
+        <strong style="color:#0ea5e9">Knowledge Summary</strong>
+        <p>Claude-generated semantic summary: critical paths, entry points, known risks, recent churn. Pre-built so triage is fast.</p>
+      </div>
+    </div>
+    <div class="layer-row">
+      <div class="layer-num" style="background:#10b981">3</div>
+      <div class="layer-content" style="background:#dcfce7">
+        <strong style="color:#10b981">Contract Layer</strong>
+        <p>Auth contracts, error contracts, data contracts, service-level agreements. This is what deliberation is grounded in.</p>
+      </div>
+    </div>
+    <div class="layer-row">
+      <div class="layer-num" style="background:#f59e0b">4</div>
+      <div class="layer-content" style="background:#fef3c7">
+        <strong style="color:#d97706">Per-Repo Skill File</strong>
+        <p>Human-enriched: gotchas, banned patterns, critical file map, testing conventions. What only your team knows about this service.</p>
+      </div>
+    </div>
+    <div class="layer-row" style="margin-bottom:0">
+      <div class="layer-num" style="background:#ef4444">5</div>
+      <div class="layer-content" style="background:#fef2f2">
+        <strong style="color:#ef4444">Live Source Code</strong>
+        <p>The actual files. Read only when the deeper layers don't have the answer. Evidence must cite file + line number.</p>
+      </div>
+    </div>
+  </section>
   <!-- diagram-4-before-after -->
   <!-- diagram-5-deliberation -->
   <!-- diagram-6-output -->
