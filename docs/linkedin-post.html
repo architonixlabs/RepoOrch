@@ -221,7 +221,51 @@
   </section>
 
   <!-- DIAGRAMS + REMAINING SECTIONS PLACEHOLDER -->
-  <!-- diagram-1-timeline -->
+  <!-- DIAGRAM 1: INCIDENT TIMELINE -->
+  <section class="section">
+    <div class="label">Diagram 1</div>
+    <div class="diagram-title">What a Typical Incident Looks Like (Without RepoOrch)</div>
+    <div class="timeline">
+      <div class="tl-row">
+        <div class="tl-time">T+0 min</div>
+        <div class="tl-line"><div class="tl-dot" style="background:#ef4444"></div></div>
+        <div class="tl-content" style="background:#fef2f2">
+          <strong style="color:#ef4444">Ticket arrives</strong> — "Users can't log in." Support engineer has no context. Opens Slack.
+        </div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-time">T+10 min</div>
+        <div class="tl-line"><div class="tl-dot" style="background:#f97316"></div></div>
+        <div class="tl-content" style="background:#fff7ed">
+          <strong style="color:#f97316">Wrong developer pinged</strong> — they own payments, not auth. Redirects to auth team. More waiting.
+        </div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-time">T+25 min</div>
+        <div class="tl-line"><div class="tl-dot" style="background:#f97316"></div></div>
+        <div class="tl-content" style="background:#fff7ed">
+          <strong style="color:#f97316">Right developer joins</strong> — starts reading the auth repo. Hasn't looked at it in 3 weeks.
+        </div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-time">T+45 min</div>
+        <div class="tl-line"><div class="tl-dot" style="background:#eab308"></div></div>
+        <div class="tl-content" style="background:#fefce8">
+          <strong style="color:#ca8a04">Root cause found</strong> — JWT claim changed in auth, breaks payments contract. Nobody documented this.
+        </div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-time">T+70 min</div>
+        <div class="tl-line"><div class="tl-dot" style="background:#10b981"></div></div>
+        <div class="tl-content" style="background:#f0fdf4">
+          <strong style="color:#059669">Fix applied</strong> — but two more services had the same dependency. Discovered in prod two days later.
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:14px;background:#f1f5f9;border-radius:8px;padding:10px 16px;font-size:0.86em;color:#374151;text-align:center">
+      <strong>70 minutes</strong> of context-gathering &nbsp;·&nbsp; <strong>2 developer interrupts</strong> &nbsp;·&nbsp; <strong>incomplete fix</strong>
+    </div>
+  </section>
   <!-- solution-prose -->
   <!-- diagram-2-arch -->
   <!-- diagram-3-layers -->
