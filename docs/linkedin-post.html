@@ -417,7 +417,32 @@
       </div>
     </div>
   </section>
-  <!-- diagram-6-output -->
+  <!-- DIAGRAM 6: CHANGE PLAN OUTPUT -->
+  <section class="section">
+    <div class="label">Diagram 6</div>
+    <div class="diagram-title">What You Actually Receive</div>
+    <div class="terminal">
+      <div style="color:#89b4fa;margin-bottom:8px">## CHANGE PLAN — Triage: AUTH-401</div>
+      <div style="color:#a6e3a1">✓ Aggregate confidence: HIGH (3 specialists, 2 resolved conflicts)</div>
+      <br>
+      <div style="color:#fab387">## AFFECTED SERVICES</div>
+      <div>→ auth-service &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color:#a6e3a1">[RESPONSIBLE]</span></div>
+      <div>→ payments-service &nbsp;&nbsp; <span style="color:#a6e3a1">[RESPONSIBLE]</span></div>
+      <div>→ notifications &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color:#f38ba8">[PARTIAL — downstream hook only]</span></div>
+      <br>
+      <div style="color:#fab387">## ORDERED STEPS</div>
+      <div><span style="color:#cba6f7">Step 1</span> — Update payments/src/verify.ts:42 to accept UUID format</div>
+      <div><span style="color:#cba6f7">Step 2</span> — Deploy payments-service</div>
+      <div><span style="color:#cba6f7">Step 3</span> — Deploy auth-service with new JWT sub claim</div>
+      <div><span style="color:#cba6f7">Step 4</span> — Verify notifications webhook still fires (manual check)</div>
+      <br>
+      <div style="color:#fab387">## RISKS</div>
+      <div><span style="color:#f38ba8">⚠</span> Out-of-order deploy will break payments token validation</div>
+      <div><span style="color:#f38ba8">⚠</span> No rollback path for JWT claim change without versioning</div>
+      <br>
+      <div style="color:#6c7086;font-style:italic">No files were modified. You decide what to execute.</div>
+    </div>
+  </section>
   <!-- diagram-7-security -->
   <!-- suggestions -->
   <!-- closing -->
