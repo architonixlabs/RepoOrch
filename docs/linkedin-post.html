@@ -443,7 +443,40 @@
       <div style="color:#6c7086;font-style:italic">No files were modified. You decide what to execute.</div>
     </div>
   </section>
-  <!-- diagram-7-security -->
+  <!-- DIAGRAM 7: SECURITY MODEL -->
+  <section class="section">
+    <div class="label">Diagram 7</div>
+    <div class="diagram-title">Safe by Design — Not by Promise</div>
+    <p style="font-size:0.9em;color:#475569;line-height:1.7;margin-bottom:16px">
+      Letting AI agents loose on your codebases is a real concern. So the safety model is enforced at the platform level — not just written in a prompt and hoped for.
+    </p>
+    <div class="grid-2">
+      <div class="tile" style="background:#fef3c7">
+        <div class="tile-title" style="color:#92400e">🛡️ Prompt injection guard</div>
+        <div class="tile-body" style="color:#78350f">All file content is treated as data. Instruction-like patterns get stripped before reaching the agents — your repos can't hijack them.</div>
+      </div>
+      <div class="tile" style="background:#ede9fe">
+        <div class="tile-title" style="color:#5b21b6">🔒 Write-blocking hook</div>
+        <div class="tile-body" style="color:#4c1d95">A platform-level hook hard-blocks all write operations — rm, git commit, git push, file redirects. Enforced, not promised.</div>
+      </div>
+      <div class="tile" style="background:#dcfce7">
+        <div class="tile-title" style="color:#166534">📋 Path allowlist</div>
+        <div class="tile-body" style="color:#14532d">Cross-repo reads are validated against registered repo names. .env files, keys, and credential patterns are blocked by policy.</div>
+      </div>
+      <div class="tile" style="background:#dbeafe">
+        <div class="tile-title" style="color:#1e40af">🧹 Ticket sanitization</div>
+        <div class="tile-body" style="color:#1e3a8a">Incident descriptions are sanitized before routing. Nobody can slip instructions into a support ticket and redirect the agents.</div>
+      </div>
+      <div class="tile" style="background:#fce7f3">
+        <div class="tile-title" style="color:#9d174d">🗄️ Registry backup &amp; validation</div>
+        <div class="tile-body" style="color:#831843">Every registry write is backed up and schema-validated first. Corruption is detected automatically with recovery instructions.</div>
+      </div>
+      <div class="tile" style="background:#f3f4f6">
+        <div class="tile-title" style="color:#374151">🔍 Stale entry detection</div>
+        <div class="tile-body" style="color:#4b5563">Sync detects registry entries whose repo no longer exists. Prompts to clean them up — no silent drift over time.</div>
+      </div>
+    </div>
+  </section>
   <!-- suggestions -->
   <!-- closing -->
 </div>
