@@ -66,20 +66,13 @@ For repos where the context file is newer than `lastIndexed`:
 
 ---
 
-## Step 3c — Refresh knowledge graphs for re-indexed repos
+## Step 3c — Refresh knowledge summaries for re-indexed repos
 
-For each repo where code drift was detected (Step 3a ran), incrementally update the knowledge graph if one already exists.
+For each repo where code drift was detected (Step 3a ran), rebuild the knowledge summary if one already exists.
 
-First, run the graphify detection script from Step 2 of `/repo-orch-graph` to establish `$GRAPHIFY_PYTHON`. Then:
+Run `/repo-orch-graph <name>` for each drifted repo. The command compares the current HEAD SHA against `summary.json`'s recorded SHA and rebuilds only if the repo has changed — so it is safe to call even for unchanged repos.
 
-```powershell
-& $GRAPHIFY_PYTHON -m graphify <repoPath> `
-    --output-dir ".repo-orchestrator/graphs/<name>" `
-    --update `
-    --no-viz
-``` If graphify is not installed or fails, skip silently — the existing graph (if any) remains valid for unchanged files.
-
-If no graph exists yet for this repo, skip (full builds are `/repo-orch-graph`'s job).
+If no summary exists yet for this repo, skip — full builds are `/repo-orch-graph`'s job. If the rebuild fails, skip silently — the existing summary (if any) remains usable for triage.
 
 ---
 

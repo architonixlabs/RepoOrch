@@ -105,7 +105,7 @@ For each issue, one line:
 | Any repo missing Agent file | Run `/repo-orch-init` — specialist agent file was not generated |
 | Any repo missing Context file | Run `/repo-orch-init` — context document was not generated |
 | Agent Teams not enabled | Add `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` to `.claude/settings.json` and restart Claude Code |
-| Graph missing for any repo | Run `/repo-orch-graph` — build knowledge graphs to reduce triage token cost |
+| Graph missing for any repo | Run `/repo-orch-graph` — build knowledge summaries to reduce triage token cost (no API key needed) |
 
 If no issues: print `  All repos healthy — no action needed.`
 

@@ -39,7 +39,7 @@ If the registry has more than 8 repos: "Warning — deliberating across N repos 
 
 ## Step 2 — Pre-fetch graph summaries
 
-For each registered repo, check for a pre-built knowledge graph and query it with the incident keywords using the same logic as `/repo-orch-triage` Step 2.5. Pass each `GRAPH_SUMMARY_<name>` to the corresponding specialist.
+For each registered repo, check for a pre-built knowledge summary and compose a `GRAPH_SUMMARY` block using the same logic as `/repo-orch-triage` Step 2 (read `summary.json`, extract fields relevant to the incident keywords). Pass each `GRAPH_SUMMARY_<name>` to the corresponding specialist.
 
 ---
 

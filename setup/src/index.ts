@@ -19,9 +19,6 @@ interface ScanResults {
   agentTeams: CheckResult;
   nodejs: CheckResult & { version: string };
   npm: CheckResult;
-  python: CheckResult & { cmd: string };
-  graphify: CheckResult;
-  uv: CheckResult;
   tier1: CheckResult;
   tier2: CheckResult;
   workspace: CheckResult & { count: number; names: string[] };
@@ -31,7 +28,6 @@ interface ScanResults {
 
 const FIX_HINTS: Record<string, string> = {
   'Agent Teams': 'Create .claude/settings.json with { "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" } }',
-  'graphify':    'Run: pip install graphifyy   (or: uv tool install graphifyy)',
   'Tier-1 indexer':  'Run: cd .claude/plugins/repo-orchestrator/indexer && npm install && npm run build',
   'Tier-2 MCP server': 'Run: cd .claude/plugins/repo-orchestrator/mcp && npm install && npm run build',
 };
@@ -111,41 +107,6 @@ async function runScan(cwd: string): Promise<ScanResults> {
       ? { status: 'OK', detail: `v${npmVer}` }
       : { status: 'MISSING', detail: 'not found (required alongside Node.js)' };
 
-  // Python
-  let pyCmd = '';
-  let pyVer = '';
-  for (const cmd of ['python3', 'python']) {
-    const v = await getVersion(cmd);
-    if (v) { pyCmd = cmd; pyVer = v; break; }
-  }
-  const pyMajor = pyVer ? parseInt(pyVer.split('.')[0], 10) : 0;
-  const pyMinor = pyVer ? parseInt(pyVer.split('.')[1], 10) : 0;
-  const python: CheckResult & { cmd: string } = !pyVer
-    ? { status: 'OPTIONAL', detail: 'not installed (graphify unavailable)', cmd: '' }
-    : (pyMajor >= 3 && pyMinor >= 10)
-      ? { status: 'OK', detail: `v${pyVer}`, cmd: pyCmd }
-      : { status: 'OLD', detail: `v${pyVer} — needs 3.10+ for graphify`, cmd: pyCmd };
-
-  // graphify
-  let gfyVer = '';
-  if (pyCmd) {
-    try {
-      const r = await execa(pyCmd, ['-c', "import graphifyy; print(getattr(graphifyy,'__version__','installed'))"], { reject: false });
-      gfyVer = r.stdout.trim();
-    } catch { /* not installed */ }
-  }
-  const graphify: CheckResult = gfyVer
-    ? { status: 'OK', detail: `v${gfyVer} — knowledge graphs ready` }
-    : pyCmd
-      ? { status: 'OPTIONAL', detail: 'not installed (run /repo-orch-graph after setup)' }
-      : { status: 'SKIP', detail: 'skipped (Python absent)' };
-
-  // uv
-  const uvVer = await getVersion('uv');
-  const uv: CheckResult = uvVer
-    ? { status: 'OK', detail: `v${uvVer} — preferred graphify installer` }
-    : { status: 'OPTIONAL', detail: 'not installed (pip used as fallback)' };
-
   // Tier-1 indexer
   const pp = pluginPath(cwd);
   const t1Built = existsSync(join(pp, 'indexer', 'dist', 'index.js'));
@@ -177,7 +138,7 @@ async function runScan(cwd: string): Promise<ScanResults> {
     ? { status: 'OK', detail: `${gitDirs.length} repo(s): ${gitDirs.join(', ')}`, count: gitDirs.length, names: gitDirs }
     : { status: 'MISSING', detail: 'no git repos found as immediate subdirectories', count: 0, names: [] };
 
-  return { claudeCode, agentTeams, nodejs, npm, python, graphify, uv, tier1, tier2, workspace };
+  return { claudeCode, agentTeams, nodejs, npm, tier1, tier2, workspace };
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -197,10 +158,6 @@ function printDashboard(r: ScanResults): void {
   console.log(sep);
   console.log(row('Node.js', r.nodejs));
   console.log(row('npm', r.npm));
-  console.log(sep);
-  console.log(row('Python', r.python));
-  console.log(row('graphify', r.graphify));
-  console.log(row('uv', r.uv));
   console.log(sep);
   console.log(row('Tier-1 indexer', r.tier1));
   console.log(row('Tier-2 MCP server', r.tier2));
@@ -238,24 +195,6 @@ function buildInstallTasks(r: ScanResults, cwd: string) {
       exp['teammateMode'] = true;
       cfg['experimental'] = exp;
       writeFileSync(p, JSON.stringify(cfg, null, 2) + '\n');
-    },
-  });
-
-  // graphify
-  tasks.push({
-    title: 'graphify  →  install via uv / pip3 / pip',
-    skip: () => r.graphify.status !== 'OPTIONAL',
-    task: async () => {
-      const installers = [
-        ['uv', ['tool', 'install', 'graphifyy']],
-        ['pip3', ['install', '--quiet', 'graphifyy']],
-        ['pip', ['install', '--quiet', 'graphifyy']],
-      ] as const;
-      for (const [cmd, args] of installers) {
-        const result = await execa(cmd, [...args], { reject: false });
-        if (result.exitCode === 0) return;
-      }
-      throw new Error('No suitable installer found. Run: pip install graphifyy');
     },
   });
 
@@ -309,9 +248,6 @@ const scanTasks = new Listr(
     'Claude Code',
     'Agent Teams',
     'Node.js / npm',
-    'Python',
-    'graphify',
-    'uv',
     'Tier-1 indexer',
     'Tier-2 MCP server',
     'Workspace layout',
@@ -357,7 +293,7 @@ if (pending.length > 0) {
 
   const listrInstall = new Listr(
     installTasks.map((t, i) => ({
-      title: `  (2${String.fromCharCode(97 + i)}/4)  ${t.title}`,
+      title: `  (2${String.fromCharCode(97 + i)}/3)  ${t.title}`,
       skip: t.skip,
       task: t.task,
     })),
@@ -416,7 +352,7 @@ console.log(sep2);
 console.log(`  ${'Workspace'.padEnd(14)} ${chalk.white(cwd)}`);
 console.log(`  ${'Repos found'.padEnd(14)} ${chalk.white(results.workspace.count + ': ' + results.workspace.names.join(', '))}`);
 console.log(`  ${'Agent Teams'.padEnd(14)} ${atEnabled ? chalk.green('enabled') : chalk.yellow('not enabled — restart Claude Code after setup')}`);
-console.log(`  ${'graphify'.padEnd(14)} ${results.graphify.status === 'OK' ? chalk.green('available — run /repo-orch-graph to build graphs') : chalk.dim('not available')}`);
+console.log(`  ${'Knowledge'.padEnd(14)} ${chalk.dim('run /repo-orch-graph to build summaries (no API key needed)')}`);
 console.log(`  ${'Indexer'.padEnd(14)} ${t1Active ? chalk.green('Tier-1 active') : chalk.dim('Tier-0 fallback')}`);
 console.log(`  ${'MCP server'.padEnd(14)} ${t2Active ? chalk.green('Tier-2 active') : chalk.dim('not built')}`);
 console.log(sep2);

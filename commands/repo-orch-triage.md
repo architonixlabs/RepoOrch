@@ -45,23 +45,25 @@ If 0 candidates: stop and report "No responsible repo identified. Review the `ow
 
 Before making the single-repo vs. team decision, check every candidate for a pre-built knowledge graph. This step runs for **both** the single-repo shortcut and the Agent Team path — do not skip it based on candidate count.
 
-For each candidate where `.repo-orchestrator/graphs/<name>/graph.json` exists, run the graphify detection script from Step 2 of `/repo-orch-graph` to obtain `$GRAPHIFY_PYTHON`, then query:
+For each candidate where `.repo-orchestrator/graphs/<name>/summary.json` exists, read the file and extract the fields most relevant to the routing keywords: `purpose`, `criticalPaths`, `domainConcepts`, `entryPoints`, `crossRepoContracts`, `recentChurn`, and `knownRisks`.
 
-```powershell
-& $GRAPHIFY_PYTHON -m graphify query "<routing keywords joined by space>" `
-    --graph ".repo-orchestrator/graphs/<name>/graph.json" `
-    --budget 1200
-```
+Compose a concise summary (target: under 600 tokens) using those fields. Prioritise entries whose content overlaps with the routing keywords — e.g. if the ticket mentions "auth", surface `criticalPaths` and `entryPoints` that mention auth, and any `knownRisks` in that area.
 
-Store the result using this exact wire format so the specialist can identify their own summary unambiguously:
+Store the result using this exact wire format so each specialist can identify their own block unambiguously:
 
 ```text
 GRAPH_SUMMARY for repo: <name>
-<graphify query output>
+Purpose: <purpose field>
+Critical paths: <matching criticalPaths entries>
+Domain concepts: <domainConcepts relevant to ticket>
+Entry points: <matching entryPoints>
+Cross-repo: <crossRepoContracts summary>
+Recent churn: <recentChurn entries>
+Known risks: <knownRisks>
 END GRAPH_SUMMARY
 ```
 
-If graphify is not installed or the query fails for a repo, omit that repo's block entirely — do not pass a null placeholder. The specialist falls back to direct file reads when no block is present. Do not abort the triage.
+If `summary.json` does not exist or cannot be read for a repo, omit that repo's block entirely — do not pass a null placeholder. The specialist falls back to direct file reads when no block is present. Do not abort the triage.
 
 ---
 

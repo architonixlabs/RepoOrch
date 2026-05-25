@@ -57,26 +57,17 @@ Apply the budget rule from that skill. Do not read every file. Extract: `languag
 
 ---
 
-## Step 2.5 — Build knowledge graphs (optional)
+## Step 2.5 — Build knowledge summaries (optional)
 
-After indexing all repos, attempt to build a graphify knowledge graph for each repo. Best-effort — if graphify is not installed or fails, continue normally.
+After indexing all repos, build a Claude-native knowledge summary for each repo. Best-effort — if a summary build fails for any repo, continue normally.
 
-First, run the graphify detection script from Step 2 of `/repo-orch-graph` to establish `$GRAPHIFY_PYTHON`. If graphify is not installed or the detection returns null, skip to the "not installed" message below. Otherwise, for each repo:
+Run `/repo-orch-graph` to build the summaries. This uses the current Claude session directly — no Python, no API key, no external tools required.
 
-```powershell
-New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | Out-Null
-& $GRAPHIFY_PYTHON -m graphify <repoPath> `
-    --output-dir ".repo-orchestrator/graphs/<name>" `
-    --mode deep `
-    --no-viz `
-    --directed
-```
-
-If graphify is not installed or detection fails, print:
+If any summary fails to build, print:
 
 ```text
-graphify not installed — skipping knowledge graph build.
-Run /repo-orch-graph after setup to build graphs and reduce future triage token cost.
+⚠️  Summary build failed for <name> — skipping.
+Run /repo-orch-graph after setup to retry.
 ```
 
 ---

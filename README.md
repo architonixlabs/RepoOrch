@@ -36,7 +36,7 @@ Regular subagents can only report to their caller. **Agent Teams** (Claude Code 
 | **Claude Code** | v2.1.32 or later |
 | **Agent Teams** | Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (see workspace setup) |
 | **Node.js 18+** | Optional — only needed for the Tier-1 indexer and MCP server. The core Tier-0 path works without it. |
-| **Python 3.10+** | Optional — only needed for graphify knowledge graphs (token-saving feature). |
+| **Python 3.10+** | Optional — not required by any core feature. |
 
 ---
 
@@ -79,9 +79,9 @@ All service repos are **immediate subdirectories of the root**. This is the layo
 
 An interactive wizard that:
 
-1. Checks all prerequisites (Claude Code version, Node.js, Python, graphify)
+1. Checks all prerequisites (Claude Code version, Node.js)
 2. Shows a pass/fail table — required items block progress, optional items are offered as installs
-3. Offers to enable Agent Teams, install graphify, and build the Tier-1/2 components
+3. Offers to enable Agent Teams and build the Tier-1/2 components
 4. Prints a readiness summary, then hands off to `/repo-orch-init` automatically
 
 **Prerequisite checks:**
@@ -91,8 +91,6 @@ An interactive wizard that:
 | Claude Code ≥ 2.1.32 | Yes | Agent Teams support |
 | Workspace layout | Yes | At least one git repo as an immediate subdirectory |
 | Node.js ≥ 18 | No | Tier-1 indexer + Tier-2 MCP server |
-| Python ≥ 3.10 | No | graphify knowledge graphs |
-| graphify | No | Pre-built graphs for token savings |
 | Agent Teams env var | No | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` |
 
 ### 2 — Bootstrap only (skip the wizard)
@@ -105,7 +103,7 @@ What it does:
 
 1. Discovers all git repos under the workspace root
 2. Indexes each repo (language, frameworks, endpoints, events, dependencies)
-3. Builds knowledge graphs per repo if graphify is installed *(reduces future triage token cost)*
+3. Builds a Claude-native knowledge summary per repo *(reduces future triage token cost)*
 4. Writes an editable context document per repo — **then pauses for your review**
 5. You edit the context files (especially `owns` — this drives routing)
 6. You confirm → specialist agents and `registry.json` are written
@@ -149,12 +147,12 @@ Graphs are stored in `.repo-orchestrator/graphs/<name>/graph.json`. Once built, 
 
 ## Token-saving architecture
 
-By default each `/repo-orch-triage` call has specialists cold-read source files for every ticket. The graphify integration changes this:
+By default each `/repo-orch-triage` call has specialists cold-read source files for every ticket. The knowledge summary changes this:
 
 ```text
-/repo-orch-graph  →  builds graph.json per repo (one-time cost)
+/repo-orch-graph  →  Claude reads each repo and writes summary.json (one-time cost, no API key)
      ↓
-/repo-orch-triage         →  master pre-queries each candidate's graph (1200-token budget)
+/repo-orch-triage         →  master reads summary.json and composes GRAPH_SUMMARY (~600 tokens)
      ↓
 specialist      →  reads GRAPH_SUMMARY first, targeted file reads only for gaps
 ```
@@ -165,7 +163,7 @@ specialist      →  reads GRAPH_SUMMARY first, targeted file reads only for gap
 - After a major refactor (`--rebuild`)
 - `/repo-orch-sync` handles incremental updates automatically when code drift is detected
 
-**Requires:** Python 3.10+ and `pip install graphifyy`. If graphify is not installed, the plugin degrades gracefully to direct file reads at every step.
+**No external dependencies required.** `/repo-orch-graph` runs entirely within the Claude Code session. If no summary exists, the plugin degrades gracefully to direct file reads at every step.
 
 ---
 
@@ -200,7 +198,7 @@ The `/repo-orch-graph` integration is the primary lever for reducing ongoing tok
 | **Setup runner** | Rich `listr2` UI for `/repo-orch-setup` (progress steps, spinners, color) | Node.js 18+ |
 | **Tier 1 — Indexer** | Faster, deterministic extraction | Node.js 18+ |
 | **Tier 2 — MCP server** | Live registry tools for the master agent | Node.js 18+ |
-| **graphify graphs** | Pre-built knowledge graphs that cut triage token cost | Python 3.10+ |
+| **Knowledge summaries** | Claude-native per-repo summaries that cut triage token cost | None — runs in session |
 
 ### Build setup runner (rich UI)
 
@@ -235,15 +233,13 @@ Then add the MCP server to your workspace `.claude/settings.json`:
 }
 ```
 
-### Install graphify
+### Build knowledge summaries
 
-```bash
-pip install graphifyy
-# or, if you use uv:
-uv tool install graphifyy
+```text
+/repo-orch-graph
 ```
 
-Then run `/repo-orch-graph` to build the graphs. No other configuration needed.
+Runs entirely within the Claude Code session — no Python, no API key, no external tools. Claude reads each repo and writes `.repo-orchestrator/graphs/<name>/summary.json`. Subsequent triage calls pre-load this summary to give specialists an orientation layer before they read source files.
 
 ---
 
@@ -283,8 +279,8 @@ repo-orchestrator/
 │   ├── init-context.md             Bootstrap: discover → index → graph → pause → register
 │   ├── sync-context.md             Drift detection + incremental graph update
 │   ├── edit-context.md             Guided context editing
-│   ├── graph-context.md            Build/refresh graphify knowledge graphs
-│   ├── triage.md                   Master controller (graph pre-query + agent team)
+│   ├── graph-context.md            Build/refresh Claude-native knowledge summaries
+│   ├── triage.md                   Master controller (summary pre-load + agent team)
 │   └── deliberate.md               Adversarial root-cause mode
 ├── hooks/hooks.json                SessionStart registry check
 ├── schemas/
@@ -341,7 +337,7 @@ your-workspace/
 - **`TRIAGE_ID` session token** — master generates a short deterministic token per triage and requires it echoed back in every specialist report; enables correct report-to-session matching when specialists return asynchronously
 - **ROUTING CONTEXT block validation** — master validates required fields (`Routing confidence`, `Your routing score`, `agent: repo-` entries) before passing to specialists; regenerates from raw scores if truncated
 - **`GRAPH_SUMMARY` wire format defined** — summaries wrapped as `GRAPH_SUMMARY for repo: <name> … END GRAPH_SUMMARY`; specialists read only their own named block, eliminating cross-contamination in multi-specialist context windows
-- **Duplicate graph-fetch removed from Step 3.5** — was re-running graphify for every candidate even though Step 2 had already fetched all summaries; doubled token cost and wall-clock on every multi-repo triage
+- **Duplicate graph-fetch removed from Step 3.5** — was re-fetching summaries for every candidate even though Step 2 had already loaded them; doubled token cost and wall-clock on every multi-repo triage
 - **Candidate count guard in Step 3.5** — explicit trim-to-5 with warning if routing returns >5 candidates
 
 **Confidence and synthesis:**
@@ -429,18 +425,18 @@ your-workspace/
 ### v0.2.1
 
 - **`/repo-orch-setup` command** — interactive installer that checks all prerequisites before bootstrapping
-  - Verifies Claude Code ≥ 2.1.32, workspace layout, Node.js ≥ 18, Python ≥ 3.10
-  - Detects and reports optional components: graphify, uv, Tier-1 indexer, Tier-2 MCP server
-  - Offers to fix missing optional items (install graphify, build tiers, create Agent Teams settings)
+  - Verifies Claude Code ≥ 2.1.32, workspace layout, Node.js ≥ 18
+  - Detects and reports optional components: Tier-1 indexer, Tier-2 MCP server
+  - Offers to fix missing optional items (build tiers, create Agent Teams settings)
   - Prints a readiness summary then hands off to `/repo-orch-init` automatically
 - SessionStart hook updated to suggest `/repo-orch-setup` for first-time users
 - Automated release workflow now extracts changelog notes per version tag
 
 ### v0.2.0
 
-- **graphify integration** — `/repo-orch-graph` command builds per-repo knowledge graphs; `/repo-orch-triage` pre-queries them before spawning specialists; `/repo-orch-sync` incrementally updates graphs on drift; specialists read graph summary first and use targeted file reads only for gaps
+- **Knowledge summary integration** — `/repo-orch-graph` spawns a Claude subagent to read each repo and write a structured `summary.json`; `/repo-orch-triage` pre-loads summaries before spawning specialists; `/repo-orch-sync` incrementally rebuilds summaries on code drift; no Python, no API key required
 - Specialist template updated to consume `GRAPH_SUMMARY` from master context
-- Graceful degradation at every step when graphify is not installed
+- Graceful degradation at every step when no summary exists
 
 ### v0.1.0
 

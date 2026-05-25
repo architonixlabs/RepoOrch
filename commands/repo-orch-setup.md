@@ -44,9 +44,6 @@ Then print the scan checklist upfront:
        Checking Claude Code…
        Checking Agent Teams…
        Checking Node.js / npm…
-       Checking Python…
-       Checking graphify…
-       Checking uv…
        Checking Tier-1 indexer…
        Checking Tier-2 MCP server…
        Checking workspace layout…
@@ -83,27 +80,6 @@ if [ -z "$node_ver" ]; then npm_status="SKIP"; npm_detail="skipped"
 elif [ -n "$npm_ver" ]; then npm_status="OK"; npm_detail="v$npm_ver"
 else npm_status="MISSING"; npm_detail="not found"; fi
 
-py_cmd=""; py_ver=""
-for cmd in python3 python; do
-  v=$($cmd --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
-  if [ -n "$v" ]; then py_cmd=$cmd; py_ver=$v; break; fi
-done
-py_major=$(echo "${py_ver:-0.0.0}" | cut -d. -f1)
-py_minor=$(echo "${py_ver:-0.0.0}" | cut -d. -f2)
-if [ -z "$py_ver" ]; then py_status="OPTIONAL"; py_detail="not installed"
-elif [ "$py_major" -ge 3 ] && [ "$py_minor" -ge 10 ]; then py_status="OK"; py_detail="v$py_ver"
-else py_status="OLD"; py_detail="v$py_ver (needs 3.10+)"; fi
-
-gfy_ver=""
-[ -n "$py_cmd" ] && gfy_ver=$($py_cmd -c "import graphifyy; print(getattr(graphifyy,'__version__','installed'))" 2>/dev/null || echo "")
-if [ -n "$gfy_ver" ]; then gfy_status="OK"; gfy_detail="v$gfy_ver — ready"
-elif [ -n "$py_cmd" ]; then gfy_status="OPTIONAL"; gfy_detail="not installed"
-else gfy_status="SKIP"; gfy_detail="skipped"; fi
-
-uv_ver=$(uv --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
-if [ -n "$uv_ver" ]; then uv_status="OK"; uv_detail="v$uv_ver"
-else uv_status="OPTIONAL"; uv_detail="not installed"; fi
-
 pp=".claude/plugins/repo-orchestrator"
 if [ -f "$pp/indexer/dist/index.js" ]; then t1_status="OK"; t1_detail="built"
 elif [ -n "$node_ver" ]; then t1_status="OPTIONAL"; t1_detail="not built"
@@ -126,10 +102,6 @@ CC_STATUS=$cc_status|$cc_detail
 AT_STATUS=$at_status|$at_detail
 NODE_STATUS=$node_status|$node_detail
 NPM_STATUS=$npm_status|$npm_detail
-PY_STATUS=$py_status|$py_detail
-PY_CMD=$py_cmd
-GFY_STATUS=$gfy_status|$gfy_detail
-UV_STATUS=$uv_status|$uv_detail
 T1_STATUS=$t1_status|$t1_detail
 T2_STATUS=$t2_status|$t2_detail
 WS_STATUS=$ws_status|$ws_detail
@@ -153,10 +125,6 @@ Print the results dashboard:
   <icon>  Node.js                <NODE_DETAIL>
   <icon>  npm                    <NPM_DETAIL>
   ──────────────────────────────────────────────────────────
-  <icon>  Python                 <PY_DETAIL>
-  <icon>  graphify               <GFY_DETAIL>
-  <icon>  uv                     <UV_DETAIL>
-  ──────────────────────────────────────────────────────────
   <icon>  Tier-1 indexer         <T1_DETAIL>
   <icon>  Tier-2 MCP server      <T2_DETAIL>
   ──────────────────────────────────────────────────────────
@@ -175,7 +143,7 @@ For each item with status `OPTIONAL`, install silently in one Bash call per item
 - Before: `⟳ (2x/4) <name> → <action>…`
 - After: `✓ / ✗ / ○ (2x/4) <result>`
 
-Steps: (2a) Agent Teams settings file — (2b) graphify — (2c) Tier-1 indexer — (2d) Tier-2 MCP server.
+Steps: (2a) Agent Teams settings file — (2b) Tier-1 indexer — (2c) Tier-2 MCP server.
 
 Print the summary then proceed to Step 4.
 

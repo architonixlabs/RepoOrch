@@ -1,19 +1,21 @@
 ---
 name: repo-orch-graph
-description: "Build or refresh the graphify knowledge graph for one or all repos. Produces .repo-orchestrator/graphs/<name>/graph.json used by /triage to pre-populate specialist context, reducing token consumption."
+description: "Build or refresh the Claude-native knowledge summary for one or all repos. Produces .repo-orchestrator/graphs/<name>/summary.json used by /triage to pre-populate specialist context, reducing token consumption. No external dependencies — runs entirely within the Claude session."
 ---
 
 # /repo-orch-graph [repo]
 
-Build (or incrementally refresh) the graphify knowledge graph for all repos, or a single named repo.
+Build (or incrementally refresh) the knowledge summary for all repos, or a single named repo.
 
 Usage:
 
-- `/repo-orch-graph` — build graphs for all repos in the registry
-- `/repo-orch-graph auth-service` — build/refresh graph for one repo
-- `/repo-orch-graph --rebuild` — force full rebuild even if graph exists
+- `/repo-orch-graph` — build summaries for all repos in the registry
+- `/repo-orch-graph auth-service` — build/refresh summary for one repo
+- `/repo-orch-graph --rebuild` — force full rebuild even if summary exists
 
-Graphs are stored in `.repo-orchestrator/graphs/<name>/` and consumed automatically by `/repo-orch-triage`.
+Summaries are stored in `.repo-orchestrator/graphs/<name>/` and consumed automatically by `/repo-orch-triage`.
+
+No Python, no API key, no external tools required — this command runs entirely within the current Claude Code session.
 
 ---
 
@@ -23,177 +25,118 @@ Read `.repo-orchestrator/registry.json`. If it does not exist, stop:
 "Registry not found. Run `/repo-orch-init` first."
 
 If a repo name was provided, find that entry. If not found, stop:
-"Repo `<name>` not found in registry. Available: see names in registry."
+"Repo `<name>` not found in registry. Available: `<list of names from registry>`"
 
 ---
 
-## Step 2 — Ensure graphify is installed
-
-Run the graphify detection script. If graphify is not installed, install it:
-
-```powershell
-$GRAPHIFY_PYTHON = $null
-
-function Find-GraphifyPython {
-    if (Get-Command uv -ErrorAction SilentlyContinue) {
-        $uvDir = (uv tool dir 2>$null).Trim()
-        if ($uvDir) {
-            $py = Join-Path $uvDir "graphifyy\Scripts\python.exe"
-            if (Test-Path $py) {
-                & $py -c "import graphify" 2>$null
-                if ($LASTEXITCODE -eq 0) { return $py }
-            }
-        }
-    }
-    if (Get-Command pipx -ErrorAction SilentlyContinue) {
-        $venvs = (pipx environment --value PIPX_LOCAL_VENVS 2>$null).Trim()
-        if ($venvs) {
-            $py = Join-Path $venvs "graphifyy\Scripts\python.exe"
-            if (Test-Path $py) {
-                & $py -c "import graphify" 2>$null
-                if ($LASTEXITCODE -eq 0) { return $py }
-            }
-        }
-    }
-    $pyCmd = Get-Command python -ErrorAction SilentlyContinue
-    if ($pyCmd) {
-        & $pyCmd.Source -c "import graphify" 2>$null
-        if ($LASTEXITCODE -eq 0) {
-            return (& $pyCmd.Source -c "import sys; print(sys.executable)").Trim()
-        }
-    }
-    return $null
-}
-
-$GRAPHIFY_PYTHON = Find-GraphifyPython
-if (-not $GRAPHIFY_PYTHON) {
-    if (Get-Command uv -ErrorAction SilentlyContinue) {
-        uv tool install --upgrade graphifyy -q 2>&1 | Select-Object -Last 3
-    } else {
-        pip install graphifyy -q 2>&1 | Select-Object -Last 3
-    }
-    $GRAPHIFY_PYTHON = Find-GraphifyPython
-}
-
-if (-not $GRAPHIFY_PYTHON) {
-    Write-Error "graphify not found and could not be installed. Install manually: pip install graphifyy"
-    exit 1
-}
-```
-
----
-
-## Step 2.5 — Check for LLM API key
-
-graphify needs an LLM API key to analyse source code. Run this check before attempting any build:
-
-```powershell
-$GRAPHIFY_BACKEND = $null
-$GRAPHIFY_API_KEY = $null
-
-if ($env:ANTHROPIC_API_KEY)  { $GRAPHIFY_BACKEND = "anthropic"; $GRAPHIFY_API_KEY = $env:ANTHROPIC_API_KEY }
-elseif ($env:OPENAI_API_KEY) { $GRAPHIFY_BACKEND = "openai";    $GRAPHIFY_API_KEY = $env:OPENAI_API_KEY }
-elseif ($env:GEMINI_API_KEY) { $GRAPHIFY_BACKEND = "gemini";    $GRAPHIFY_API_KEY = $env:GEMINI_API_KEY }
-elseif ($env:DEEPSEEK_API_KEY){ $GRAPHIFY_BACKEND = "deepseek"; $GRAPHIFY_API_KEY = $env:DEEPSEEK_API_KEY }
-```
-
-If `$GRAPHIFY_BACKEND` is still `$null` after the check, stop and print:
-
-```text
-⚠️  Graph build requires an LLM API key — none found in the current shell.
-
-  graphify calls an LLM to analyse your source code.
-  Even though you are running inside Claude Code, the key is not
-  automatically forwarded to child processes.
-
-  ── Quickest fix (current session only) ──────────────────────────
-  $env:ANTHROPIC_API_KEY = "sk-ant-..."      # PowerShell
-  export ANTHROPIC_API_KEY="sk-ant-..."      # bash / zsh
-
-  ── Permanent fix (persists across sessions) ─────────────────────
-  Add the key to .claude/settings.json so Claude Code injects it
-  into every shell it spawns:
-
-    {
-      "env": {
-        "ANTHROPIC_API_KEY": "sk-ant-..."
-      }
-    }
-
-  Your Anthropic key lives at: https://console.anthropic.com/settings/keys
-  (OpenAI / Gemini / DeepSeek keys work too — set the matching variable above.)
-
-  ── Re-run after setting the key ─────────────────────────────────
-  /repo-orch-graph
-
-  /repo-orch-triage will fall back to direct file reads in the meantime
-  — no functionality is lost, triage just costs slightly more tokens.
-```
-
-If a key was found, continue and print a single line:
-
-```text
-  Using <GRAPHIFY_BACKEND> backend for graph build.
-```
-
----
-
-## Step 3 — Build graphs
+## Step 2 — Decide full build vs. incremental
 
 For each repo to process:
 
 1. Determine the repo path from `registry.json` (the `path` field).
-2. Set the output directory: `.repo-orchestrator/graphs/<name>/`.
-3. Check if `--rebuild` was passed OR if no `graph.json` exists yet → full build. Otherwise → incremental update.
+2. Set the output path: `.repo-orchestrator/graphs/<name>/summary.json`.
+3. **Full build** if: `--rebuild` was passed OR `summary.json` does not exist.
+4. **Incremental update** if: `summary.json` exists and `--rebuild` was not passed.
+   - Run `git -C <repoPath> rev-parse HEAD` to get the current HEAD SHA.
+   - Read the `generatedAt.commitSHA` field from the existing `summary.json`.
+   - If the SHAs match: print `<name>  up to date — skipping.` and skip this repo.
+   - If they differ: run a full build (the codebase has changed since last summary).
 
-**Full build:**
+---
 
-```powershell
-New-Item -ItemType Directory -Force -Path ".repo-orchestrator/graphs/<name>" | Out-Null
-$env:ANTHROPIC_API_KEY  = if ($GRAPHIFY_BACKEND -eq "anthropic")  { $GRAPHIFY_API_KEY } else { $env:ANTHROPIC_API_KEY }
-$env:OPENAI_API_KEY     = if ($GRAPHIFY_BACKEND -eq "openai")     { $GRAPHIFY_API_KEY } else { $env:OPENAI_API_KEY }
-$env:GEMINI_API_KEY     = if ($GRAPHIFY_BACKEND -eq "gemini")     { $GRAPHIFY_API_KEY } else { $env:GEMINI_API_KEY }
-$env:DEEPSEEK_API_KEY   = if ($GRAPHIFY_BACKEND -eq "deepseek")   { $GRAPHIFY_API_KEY } else { $env:DEEPSEEK_API_KEY }
-& $GRAPHIFY_PYTHON -m graphify <repoPath> `
-    --output-dir ".repo-orchestrator/graphs/<name>" `
-    --mode deep `
-    --no-viz `
-    --directed
+## Step 3 — Build summary (Claude-native, no external tools)
+
+For each repo requiring a build, spawn a **subagent** with the following instructions. The subagent has read-only access to the repo's files. Pass it the repo name, repo path, and the registry entry (all fields).
+
+---
+
+### Subagent instructions
+
+You are building a knowledge summary for the **`<name>`** repository at `<path>`. Your output will be saved as `.repo-orchestrator/graphs/<name>/summary.json` and used to give triage specialists a fast orientation layer before they read source files. Write accurate, specific content — specialists will rely on it.
+
+**You must not modify any file. Read only.**
+
+#### Reading budget
+
+Large repos can have hundreds of files. Read strategically — do not read every file. Work through these in order and stop as soon as you have enough to fill all summary fields:
+
+1. `README.md` or `README.*` — purpose, architecture overview, key concepts
+2. Package/build manifest: `package.json`, `*.csproj`, `pom.xml`, `go.mod`, `pyproject.toml`, `Gemfile`, `Cargo.toml` — languages, frameworks, direct dependencies
+3. Top-level directory listing (one level) — understand the module/layer structure
+4. Entry points: `src/main.*`, `cmd/main.*`, `app.*`, `server.*`, `index.*` (max 3 files, first 100 lines each)
+5. Route/controller/handler files: `*.routes.*`, `*.controller.*`, `*.handler.*`, `router.*` (max 5 files, first 80 lines each)
+6. Event definitions: `*.events.*`, `events.*`, `*.pubsub.*` (max 3 files)
+7. Shared schema/contract files: `*.schema.*`, `*.proto`, `*.graphql` (max 3 files)
+8. Recent git log — understand what changed recently:
+
+   ```bash
+   git -C <path> log --oneline -20
+   ```
+
+#### What to produce
+
+Build a JSON object with these fields:
+
+```json
+{
+  "repo": "<name>",
+  "generatedAt": {
+    "timestamp": "<ISO8601>",
+    "commitSHA": "<git HEAD SHA>"
+  },
+  "purpose": "<one sentence — what this service does>",
+  "keyModules": [
+    { "path": "<relative/path/to/module>", "role": "<what it does — one line>" }
+  ],
+  "domainConcepts": ["<concept1>", "<concept2>"],
+  "criticalPaths": [
+    "<short description of an important execution path, e.g. 'POST /login → auth middleware → JWT issuance'>"
+  ],
+  "entryPoints": [
+    { "type": "<http|grpc|event|websocket|cli>", "name": "<METHOD /path or event name>", "handler": "<file:line>" }
+  ],
+  "crossRepoContracts": {
+    "callsOut": ["<repo-name>: <what it calls>"],
+    "calledBy": ["<repo-name>: <what they call>"],
+    "sharedEvents": ["<event name>: <emit|consume>"],
+    "sharedData": ["<table or cache key shared with other services>"]
+  },
+  "recentChurn": [
+    { "file": "<relative path>", "commits": <N>, "summary": "<what changed — one line>" }
+  ],
+  "knownRisks": ["<architectural concern or known fragile area>"],
+  "tokenBudgetUsed": "<estimated tokens read during this build>"
+}
 ```
 
-**Incremental update (graph.json already exists):**
+Field rules:
 
-```powershell
-& $GRAPHIFY_PYTHON -m graphify <repoPath> `
-    --output-dir ".repo-orchestrator/graphs/<name>" `
-    --update `
-    --no-viz
-```
+- `keyModules`: 3–10 entries. Only the most architecturally significant modules — not every file.
+- `domainConcepts`: 5–15 short keywords a ticket author would use to describe problems in this service (e.g. `auth`, `jwt`, `sessions`).
+- `criticalPaths`: 2–5 key request flows or processing pipelines. One sentence each.
+- `entryPoints`: all externally-facing interfaces found. Empty array if none found.
+- `crossRepoContracts`: populate from manifest imports, event files, and context file `dependsOn`/`providesTo` if available. Empty arrays are valid.
+- `recentChurn`: files with 3+ commits in the last 20 log entries. These are hotspots relevant to triage.
+- `knownRisks`: flag anything that would surprise a triage specialist — missing tests on a critical path, a module that does too many things, a deprecated dependency still in use.
+- `tokenBudgetUsed`: rough estimate (e.g. "~3200 tokens"). Helps the user understand cost.
 
-Print progress per repo:
+Write factual, evidence-based content. Every `criticalPaths` entry and `knownRisks` entry should be derivable from what you read. Do not speculate.
+
+---
+
+After the subagent returns, write its JSON output to `.repo-orchestrator/graphs/<name>/summary.json`.
+
+If the subagent fails or returns malformed output: print a warning and continue with the next repo — do not abort the whole run:
 
 ```text
-Building graph for auth-service... done (N nodes, M edges)
-Building graph for payments...     done (N nodes, M edges)
+⚠️  Summary build failed for <name>: <error>. /repo-orch-triage will fall back to direct file reads for this repo.
 ```
 
-Read the node/edge counts from `graph.json` (`graph.nodes` and `graph.edges` arrays) to fill in the summary.
-
-If graphify fails for a repo, print a warning and continue with the rest — do not abort the whole run.
-
-If the error output contains "api key" or "authentication" (case-insensitive):
+Print progress per repo as each completes:
 
 ```text
-⚠️  Graph build failed for <name>: API key error — <error summary>.
-    The key was found in the shell but graphify could not authenticate.
-    Check that the key is valid at the provider's console.
-    /repo-orch-triage will fall back to direct file reads for this repo.
-```
-
-Otherwise:
-
-```text
-⚠️  Graph build failed for <name>: <error summary>. /repo-orch-triage will fall back to direct file reads for this repo.
+Building summary for auth-service... done (~3200 tokens, 8 key modules, 4 critical paths)
+Building summary for payments...     done (~2800 tokens, 6 key modules, 3 critical paths)
 ```
 
 ---
@@ -201,11 +144,13 @@ Otherwise:
 ## Step 4 — Report
 
 ```text
-✅ Knowledge graphs built:
+✅ Knowledge summaries built:
 
-  auth-service  → .repo-orchestrator/graphs/auth-service/graph.json  (42 nodes, 67 edges)
-  payments      → .repo-orchestrator/graphs/payments/graph.json       (31 nodes, 48 edges)
+  auth-service  → .repo-orchestrator/graphs/auth-service/summary.json
+  payments      → .repo-orchestrator/graphs/payments/summary.json
 
-/repo-orch-triage will now use these graphs to pre-populate specialist context.
+/repo-orch-triage will now use these summaries to pre-populate specialist context.
 Run /repo-orch-graph --rebuild to force a full rebuild after major refactors.
+
+No API key or external tools required — summaries are built by Claude directly.
 ```
