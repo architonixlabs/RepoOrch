@@ -5,108 +5,222 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RepoOrch — LinkedIn Post</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #f8fafc;
-    color: #1e293b;
-    line-height: 1.7;
-    padding: 40px 20px;
+  /* ─── Color Palette ────────────────────────────────────────────── */
+  :root {
+    --color-bg:            #eef2f7;
+    --color-header-bg:     #0f172a;
+    --color-header-text:   #f8fafc;
+    --color-tagline:       #94a3b8;
+    --color-card-white:    #ffffff;
+    --color-card-diagram:  #f8fafc;
+    --color-border:        #e2e8f0;
+    --color-text-primary:  #0f172a;
+    --color-text-body:     #1e293b;
+    --color-text-muted:    #64748b;
+    --color-text-subtle:   #94a3b8;
+    --color-label:         #64748b;
+    --color-accent:        #4f46e5;
+    --color-accent-hover:  #4338ca;
+    --shadow-card:         0 2px 8px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.04);
+    --shadow-card-hover:   0 4px 16px rgba(15,23,42,0.12), 0 2px 4px rgba(15,23,42,0.06);
+    --radius-card:         14px;
+    --radius-inner:        8px;
   }
-  .post {
-    max-width: 720px;
+
+  /* ─── Reset & Base ─────────────────────────────────────────────── */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text-body);
+    line-height: 1.7;
+  }
+
+  /* ─── Site Header ──────────────────────────────────────────────── */
+  .site-header {
+    background: var(--color-header-bg);
+    padding: 36px 20px 32px;
+    text-align: center;
+    border-bottom: 3px solid var(--color-accent);
+  }
+
+  .site-header-inner {
+    max-width: 740px;
     margin: 0 auto;
+  }
+
+  .site-logo {
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--color-header-text);
+    line-height: 1.1;
+  }
+
+  .site-tagline {
+    font-size: 0.95rem;
+    color: var(--color-tagline);
+    margin-top: 8px;
+    letter-spacing: 0.01em;
+    font-weight: 400;
+  }
+
+  /* ─── Post Container ───────────────────────────────────────────── */
+  .post {
+    max-width: 740px;
+    margin: 0 auto;
+    padding: 44px 20px 56px;
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: 28px;
   }
+
+  /* ─── Section Cards ────────────────────────────────────────────── */
   .section {
-    background: white;
-    border-radius: 12px;
-    padding: 28px 32px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    background: var(--color-card-white);
+    border-radius: var(--radius-card);
+    padding: 36px 40px;
+    box-shadow: var(--shadow-card);
+    border: 1px solid var(--color-border);
   }
+
+  /* Diagram sections get a slightly tinted background */
+  .section:has(.diagram-title),
+  .section:has(.terminal) {
+    background: var(--color-card-diagram);
+  }
+
+  /* ─── Section Labels ───────────────────────────────────────────── */
   .label {
     display: inline-block;
-    font-size: 0.72em;
+    font-size: 0.68rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #94a3b8;
-    margin-bottom: 14px;
-  }
-  .prose { line-height: 1.9; font-size: 1.02em; color: #1e293b; }
-  .prose p { margin-bottom: 1.1em; }
-  .prose p:last-child { margin-bottom: 0; }
-  .prose strong { color: #0f172a; }
-  .prose em { color: #475569; }
-  .diagram-title {
-    font-size: 0.88em;
-    font-weight: 700;
-    color: #475569;
+    color: var(--color-label);
     margin-bottom: 16px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #e2e8f0;
+    padding: 3px 0;
+    border-bottom: 2px solid var(--color-border);
   }
-  /* Two-column grid */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  /* Tile */
-  .tile { border-radius: 8px; padding: 14px; line-height: 1.6; }
-  .tile-title { font-weight: 700; margin-bottom: 6px; font-size: 0.9em; }
-  .tile-body { font-size: 0.87em; }
-  /* Flow box */
+
+  /* ─── Diagram Title ────────────────────────────────────────────── */
+  .diagram-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border);
+    letter-spacing: -0.01em;
+  }
+
+  /* ─── Prose ────────────────────────────────────────────────────── */
+  .prose {
+    line-height: 1.8;
+    font-size: 1.05rem;
+    color: var(--color-text-body);
+  }
+  .prose p { margin-bottom: 1.15em; }
+  .prose p:last-child { margin-bottom: 0; }
+  .prose strong { color: var(--color-text-primary); font-weight: 700; }
+  .prose em { color: var(--color-text-muted); }
+
+  /* ─── Two-Column Grid ──────────────────────────────────────────── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* ─── Tile ─────────────────────────────────────────────────────── */
+  .tile {
+    border-radius: var(--radius-inner);
+    padding: 16px;
+    line-height: 1.6;
+  }
+  .tile-title { font-weight: 700; margin-bottom: 6px; font-size: 0.9rem; }
+  .tile-body { font-size: 0.87rem; }
+
+  /* ─── Flow Diagram ─────────────────────────────────────────────── */
   .flow { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
   .flow-box {
     width: 82%;
-    border-radius: 8px;
-    padding: 11px 20px;
+    border-radius: var(--radius-inner);
+    padding: 13px 22px;
     font-weight: 600;
     text-align: center;
     color: white;
-    font-size: 0.9em;
+    font-size: 0.92rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.18);
   }
-  .flow-box span { font-weight: 400; font-size: 0.87em; display: block; margin-top: 2px; opacity: 0.92; }
-  .flow-arrow { color: #94a3b8; font-size: 1.2em; }
+  .flow-box span {
+    font-weight: 400;
+    font-size: 0.85rem;
+    display: block;
+    margin-top: 3px;
+    opacity: 0.92;
+  }
+
+  .flow-arrow {
+    color: var(--color-text-subtle);
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
+    text-align: center;
+    padding: 0 8px;
+  }
+
   .flow-note {
     width: 82%;
     background: #f1f5f9;
-    border-radius: 8px;
-    padding: 10px 16px;
+    border-radius: var(--radius-inner);
+    padding: 12px 18px;
     text-align: center;
-    font-size: 0.86em;
+    font-size: 0.87rem;
     color: #374151;
-    line-height: 1.6;
+    line-height: 1.65;
+    border: 1px solid var(--color-border);
   }
-  .flow-agents { display: flex; gap: 10px; justify-content: center; width: 100%; flex-wrap: wrap; }
+
+  .flow-agents {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    width: 100%;
+    flex-wrap: wrap;
+  }
   .flow-agent {
     background: #10b981;
     color: white;
-    border-radius: 8px;
-    padding: 10px 14px;
+    border-radius: var(--radius-inner);
+    padding: 12px 14px;
     text-align: center;
     flex: 1;
     min-width: 130px;
-    font-size: 0.87em;
+    font-size: 0.87rem;
+    box-shadow: 0 2px 6px rgba(16,185,129,0.25);
   }
   .flow-agent strong { display: block; margin-bottom: 4px; }
-  .flow-agent span { font-size: 0.82em; opacity: 0.9; }
-  /* Timeline */
+  .flow-agent span { font-size: 0.82rem; opacity: 0.9; }
+
+  /* ─── Timeline ─────────────────────────────────────────────────── */
   .timeline { display: flex; flex-direction: column; gap: 0; }
+
   .tl-row { display: flex; align-items: stretch; gap: 0; }
+
   .tl-time {
-    width: 72px;
+    width: 76px;
     text-align: right;
     padding-right: 14px;
-    font-size: 0.8em;
-    color: #94a3b8;
+    font-size: 0.78rem;
+    color: var(--color-text-subtle);
     display: flex;
     align-items: center;
     justify-content: flex-end;
     flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
   }
+
   .tl-line {
     width: 3px;
-    background: #e2e8f0;
+    background: var(--color-border);
     position: relative;
     flex-shrink: 0;
   }
@@ -118,20 +232,28 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 3px white;
   }
   .tl-content {
     flex: 1;
-    padding: 10px 14px;
-    margin: 4px 0;
-    border-radius: 8px;
-    font-size: 0.88em;
-    line-height: 1.6;
+    padding: 11px 16px;
+    margin: 5px 0 5px 12px;
+    border-radius: var(--radius-inner);
+    font-size: 0.88rem;
+    line-height: 1.65;
+    border: 1px solid rgba(0,0,0,0.04);
   }
-  /* Layers */
-  .layer-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+
+  /* ─── Knowledge Layers ─────────────────────────────────────────── */
+  .layer-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 10px;
+  }
   .layer-num {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     color: white;
     display: flex;
@@ -139,64 +261,166 @@
     justify-content: center;
     font-weight: 700;
     flex-shrink: 0;
-    font-size: 0.9em;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
   }
-  .layer-content { flex: 1; border-radius: 8px; padding: 10px 14px; }
-  .layer-content strong { display: block; margin-bottom: 2px; font-size: 0.9em; }
-  .layer-content p { font-size: 0.86em; color: #374151; margin: 0; }
-  /* Before/After */
-  .ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .ba-col { border-radius: 8px; padding: 16px; border: 2px solid; }
-  .ba-col-title { font-weight: 700; margin-bottom: 14px; font-size: 0.92em; }
-  .ba-item { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid; line-height: 1.7; font-size: 0.88em; }
+  .layer-content {
+    flex: 1;
+    border-radius: var(--radius-inner);
+    padding: 11px 16px;
+    border: 1px solid rgba(0,0,0,0.05);
+  }
+  .layer-content strong {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+  .layer-content p { font-size: 0.86rem; color: #374151; margin: 0; line-height: 1.6; }
+
+  /* ─── Before / After ───────────────────────────────────────────── */
+  .ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .ba-col {
+    border-radius: var(--radius-inner);
+    padding: 18px;
+    border: 2px solid;
+  }
+  .ba-col-title {
+    font-weight: 700;
+    margin-bottom: 14px;
+    font-size: 0.93rem;
+    letter-spacing: 0.01em;
+  }
+  .ba-item {
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid;
+    line-height: 1.7;
+    font-size: 0.87rem;
+  }
   .ba-item:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
-  /* Chat bubbles */
-  .chat { display: flex; flex-direction: column; gap: 10px; }
-  .bubble { border-radius: 8px; padding: 12px 14px; line-height: 1.6; font-size: 0.88em; }
-  .bubble-label { font-weight: 700; margin-bottom: 4px; font-size: 0.88em; }
-  .bubble code { background: rgba(0,0,0,0.08); border-radius: 3px; padding: 1px 4px; font-size: 0.92em; }
+  .ba-item strong { font-weight: 700; }
+
+  /* ─── Chat Bubbles ─────────────────────────────────────────────── */
+  .chat { display: flex; flex-direction: column; gap: 12px; }
+
+  .bubble {
+    border-radius: var(--radius-inner);
+    padding: 14px 16px;
+    line-height: 1.65;
+    font-size: 0.88rem;
+    border: 1px solid rgba(0,0,0,0.05);
+  }
+  .bubble-label {
+    font-weight: 700;
+    margin-bottom: 5px;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .bubble code {
+    background: rgba(0,0,0,0.09);
+    border-radius: 4px;
+    padding: 2px 5px;
+    font-size: 0.91rem;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+
   .chat-note {
     background: #f1f5f9;
-    border-radius: 8px;
-    padding: 10px 16px;
+    border-radius: var(--radius-inner);
+    padding: 12px 18px;
     text-align: center;
-    font-size: 0.86em;
+    font-size: 0.86rem;
     color: #374151;
-    line-height: 1.6;
+    line-height: 1.65;
+    border: 1px solid var(--color-border);
   }
-  /* Terminal */
+
+  /* ─── Terminal ─────────────────────────────────────────────────── */
   .terminal {
-    background: #1e1e2e;
+    background: #1a1b2e;
     color: #cdd6f4;
-    border-radius: 8px;
-    padding: 18px;
+    border-radius: var(--radius-inner);
+    padding: 22px 24px;
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.85em;
-    line-height: 1.8;
+    font-size: 0.84rem;
+    line-height: 1.85;
+    border: 1px solid #2d2f45;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04);
   }
-  /* Suggestions */
+
+  /* ─── Suggestions ──────────────────────────────────────────────── */
   .suggestion {
     border-left: 4px solid;
-    padding: 12px 16px;
-    border-radius: 0 8px 8px 0;
-    line-height: 1.6;
-    font-size: 0.92em;
+    padding: 13px 18px;
+    border-radius: 0 var(--radius-inner) var(--radius-inner) 0;
+    line-height: 1.65;
+    font-size: 0.92rem;
     margin-bottom: 10px;
+    border-top: 1px solid rgba(0,0,0,0.04);
+    border-right: 1px solid rgba(0,0,0,0.04);
+    border-bottom: 1px solid rgba(0,0,0,0.04);
   }
   .suggestion:last-child { margin-bottom: 0; }
-  .suggestion strong { display: block; margin-bottom: 2px; }
-  /* CTA */
-  .cta { font-size: 1.02em; line-height: 1.9; }
-  .cta .link { color: #4f46e5; font-weight: 600; }
-  .cta .hashtags { color: #94a3b8; font-size: 0.9em; margin-top: 14px; }
+  .suggestion strong { display: block; margin-bottom: 3px; font-weight: 700; }
+
+  /* ─── CTA Section ──────────────────────────────────────────────── */
+  .cta { font-size: 1.05rem; line-height: 1.85; }
+  .cta p { margin-bottom: 1.1em; color: var(--color-text-body); }
+  .cta p:last-child { margin-bottom: 0; }
+  .cta .hashtags {
+    color: var(--color-text-subtle);
+    font-size: 0.87rem;
+    margin-top: 20px;
+    line-height: 1.8;
+    display: block;
+  }
+
+  /* ─── CTA Button ───────────────────────────────────────────────── */
+  .cta-button {
+    display: inline-block;
+    background: var(--color-accent);
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.97rem;
+    padding: 13px 28px;
+    border-radius: 8px;
+    margin-top: 6px;
+    margin-bottom: 4px;
+    letter-spacing: 0.01em;
+    box-shadow: 0 2px 8px rgba(79,70,229,0.35);
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  }
+  .cta-button:hover {
+    background: var(--color-accent-hover);
+    box-shadow: 0 4px 14px rgba(79,70,229,0.45);
+    transform: translateY(-1px);
+  }
+  .cta-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(79,70,229,0.3);
+  }
+
+  /* ─── Responsive ───────────────────────────────────────────────── */
   @media (max-width: 560px) {
+    .section { padding: 24px 20px; }
     .grid-2, .ba-grid { grid-template-columns: 1fr; }
     .flow-box { width: 100%; }
     .flow-note { width: 100%; }
+    .site-logo { font-size: 1.7rem; }
   }
 </style>
 </head>
 <body>
+<header class="site-header">
+  <div class="site-header-inner">
+    <div class="site-logo">RepoOrch</div>
+    <div class="site-tagline">Multi-agent coordination for distributed systems</div>
+  </div>
+</header>
 <div class="post">
   <!-- HOOK -->
   <section class="section">
@@ -513,7 +737,7 @@
       <p>That's true for support staff trying to triage a ticket. It's true for developers joining an incident they didn't cause. And it's especially true for anyone new to a codebase.</p>
       <p>RepoOrch doesn't replace your engineers. It just means nobody has to start from zero anymore.</p>
       <p><strong>It's open source. Try it, break it, tell me what's missing.</strong></p>
-      <p class="link">🔗 github.com/architonixlabs/RepoOrch</p>
+      <a class="cta-button" href="https://github.com/architonixlabs/RepoOrch" target="_blank" rel="noopener noreferrer">🔗 View on GitHub — architonixlabs/RepoOrch</a>
       <p class="hashtags">#AI #SoftwareEngineering #MultiAgent #ClaudeCode #Microservices #OpenSource #DeveloperTools #SupportEngineering</p>
     </div>
   </section>
