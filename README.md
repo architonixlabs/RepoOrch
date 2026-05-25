@@ -4,7 +4,7 @@
 
 [![Validate Plugin](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/architonixlabs/RepoOrch/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.8-blue.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.2.9-blue.svg)](.claude-plugin/plugin.json)
 
 ---
 
@@ -328,6 +328,18 @@ your-workspace/
 ---
 
 ## Changelog
+
+### v0.2.9
+
+**Claude-native knowledge summaries (replaces graphify):**
+
+- **`/repo-orch-graph` rewritten** — now spawns a Claude subagent to read each repo and produce a structured `summary.json`; no Python, no API key, no external dependencies; runs entirely within the Claude Code session
+- **`summary.json` schema** — semantic fields: `purpose`, `keyModules`, `criticalPaths`, `entryPoints`, `crossRepoContracts`, `recentChurn`, `knownRisks`, `tokenBudgetUsed`; HEAD SHA recorded for incremental skip logic
+- **Incremental updates** — command compares current git HEAD SHA against `summary.json`; skips repos whose code has not changed since last build
+- **`/repo-orch-triage` Step 2** — reads `summary.json` directly (plain file read, no subprocess); composes `GRAPH_SUMMARY` block from fields relevant to routing keywords; wire format to specialists unchanged
+- **`/repo-orch-init` and `/repo-orch-sync`** — delegate graph steps to `/repo-orch-graph`; graphify subprocess calls removed
+- **Setup wizard** — Python, graphify, and uv removed from scan checklist, install steps, and results dashboard; install step counter updated
+- **README and docs** — all graphify prerequisites and install instructions replaced with Claude-native summary documentation
 
 ### v0.2.8
 

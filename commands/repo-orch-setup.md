@@ -29,7 +29,7 @@ After it exits, proceed to Step 4 (run `/repo-orch-init`). Do not run Steps 2–
 
 ```text
 ╔══════════════════════════════════════════════════════════════╗
-║   repo-orchestrator  v0.2.8  ·  Setup & Installation         ║
+║   repo-orchestrator  v0.2.9  ·  Setup & Installation         ║
 ╚══════════════════════════════════════════════════════════════╝
 
   Steps:  [1] Scan environment  [2] Install components  [3] Bootstrap
