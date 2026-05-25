@@ -394,7 +394,29 @@
       </div>
     </div>
   </section>
-  <!-- diagram-5-deliberation -->
+  <!-- DIAGRAM 5: DELIBERATION EXCHANGE -->
+  <section class="section">
+    <div class="label">Diagram 5</div>
+    <div class="diagram-title">What "Direct Peer Deliberation" Actually Looks Like</div>
+    <div class="chat">
+      <div class="bubble" style="background:#ede9fe">
+        <div class="bubble-label" style="color:#4f46e5">Auth Specialist → Payments</div>
+        "I'm changing the JWT <code>sub</code> claim from user ID to a UUID. Does your service depend on the current format?"
+      </div>
+      <div class="bubble" style="background:#dcfce7">
+        <div class="bubble-label" style="color:#059669">Payments Specialist → Auth</div>
+        "Yes — <code>payments/src/verify.ts:42</code> parses <code>sub</code> as an integer. A UUID will break token validation. You need to update that file or version the claim."
+      </div>
+      <div class="bubble" style="background:#ede9fe">
+        <div class="bubble-label" style="color:#4f46e5">Auth Specialist → Master</div>
+        "Conflict resolved. Step 2 must include updating <code>payments/src/verify.ts</code> before auth deploys. Risk: out-of-order deploy breaks token validation."
+      </div>
+      <div class="chat-note">
+        This exchange happens <strong>before the plan reaches you.</strong><br>
+        <span style="font-size:0.88em;color:#6b7280">Evidence must cite file + line. Unsupported claims are flagged as unresolved risks.</span>
+      </div>
+    </div>
+  </section>
   <!-- diagram-6-output -->
   <!-- diagram-7-security -->
   <!-- suggestions -->
