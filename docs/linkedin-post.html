@@ -266,8 +266,57 @@
       <strong>70 minutes</strong> of context-gathering &nbsp;·&nbsp; <strong>2 developer interrupts</strong> &nbsp;·&nbsp; <strong>incomplete fix</strong>
     </div>
   </section>
-  <!-- solution-prose -->
-  <!-- diagram-2-arch -->
+  <!-- SOLUTION PROSE -->
+  <section class="section">
+    <div class="label">What I Built</div>
+    <div class="prose">
+      <p>So I built <strong>RepoOrch</strong> — a Claude Code plugin that does something I haven't seen elsewhere.</p>
+      <p>Instead of one AI assistant reading one repo, it spawns a team of AI specialists — one per microservice — and makes them actually talk to each other.</p>
+      <p>You describe a problem. The master agent figures out which services are involved, routes to the right specialists, and each one reads its repo deeply — not just surface files, but contracts, entry points, critical paths, recent churn.</p>
+      <p>Then they message each other directly. "Does my change to the JWT claim break your service?" The payments specialist responds. They resolve it — or flag it as a risk — before the plan ever reaches you.</p>
+      <p>At the end, you get one change plan. Ordered. With risks. And nothing is touched without your say-so.</p>
+    </div>
+  </section>
+  <!-- DIAGRAM 2: ARCHITECTURE FLOW -->
+  <section class="section">
+    <div class="label">Diagram 2</div>
+    <div class="diagram-title">How the Agent Team Coordinates</div>
+    <div class="flow">
+      <div class="flow-box" style="background:#4f46e5">
+        You: describe the problem in plain English
+        <span>"Users can't log in after this morning's deploy"</span>
+      </div>
+      <div class="flow-arrow">↓ sanitized · routed</div>
+      <div class="flow-box" style="background:#0ea5e9">
+        Master Agent
+        <span>reads service registry · scores relevance · routes to top specialists</span>
+      </div>
+      <div class="flow-arrow">↓ spawns agent team with dedicated context windows</div>
+      <div class="flow-agents">
+        <div class="flow-agent">
+          <strong>Auth Specialist</strong>
+          <span>reads auth repo<br>contracts · entry points<br>recent churn</span>
+        </div>
+        <div class="flow-agent">
+          <strong>Payments Specialist</strong>
+          <span>reads payments repo<br>JWT dependencies<br>error contracts</span>
+        </div>
+        <div class="flow-agent">
+          <strong>Notifications Spec.</strong>
+          <span>reads notif. repo<br>downstream hooks<br>service level</span>
+        </div>
+      </div>
+      <div class="flow-note">
+        ↔ <strong>Direct peer deliberation</strong><br>
+        "Does my JWT claim change break your service?" · "Yes — update field X first" · Conflict resolved before plan is written
+      </div>
+      <div class="flow-arrow">↓ synthesised by master agent</div>
+      <div class="flow-box" style="background:#f59e0b">
+        Single ordered change plan
+        <span>affected services · change order · cross-repo risks · rollback guidance · nothing modified</span>
+      </div>
+    </div>
+  </section>
   <!-- diagram-3-layers -->
   <!-- diagram-4-before-after -->
   <!-- diagram-5-deliberation -->
