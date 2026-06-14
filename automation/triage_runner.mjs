@@ -19,9 +19,9 @@
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { resolve } from 'path';
-import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { assertNonEmpty, assertRegistry } from './validate.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -41,20 +41,13 @@ const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
  * @returns {Promise<string>} The final triage plan text.
  */
 export async function runTriage({ ticket, workspaceRoot, model, timeoutMs }) {
-  if (!ticket || !ticket.trim()) {
-    throw new Error('runTriage: ticket must be a non-empty string.');
-  }
+  assertNonEmpty('runTriage: ticket', ticket);
 
   const cwd = workspaceRoot ?? process.cwd();
   const resolvedModel = model ?? DEFAULT_MODEL;
   const resolvedTimeout = timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  const registryPath = resolve(cwd, '.repo-orchestrator', 'registry.json');
-  try {
-    readFileSync(registryPath, 'utf8');
-  } catch {
-    throw new Error(`Registry not found at ${registryPath}. Run /repo-orch-init in the workspace first.`);
-  }
+  assertRegistry(cwd);
 
   const runQuery = async () => {
     let plan = '';
@@ -124,20 +117,13 @@ export async function runTriage({ ticket, workspaceRoot, model, timeoutMs }) {
  * @returns {Promise<string>} The final deliberation report text.
  */
 export async function runDeliberate({ incident, workspaceRoot, model, timeoutMs }) {
-  if (!incident || !incident.trim()) {
-    throw new Error('runDeliberate: incident must be a non-empty string.');
-  }
+  assertNonEmpty('runDeliberate: incident', incident);
 
   const cwd = workspaceRoot ?? process.cwd();
   const resolvedModel = model ?? DEFAULT_MODEL;
   const resolvedTimeout = timeoutMs ?? 10 * 60 * 1000; // deliberate is longer — 10 min default
 
-  const registryPath = resolve(cwd, '.repo-orchestrator', 'registry.json');
-  try {
-    readFileSync(registryPath, 'utf8');
-  } catch {
-    throw new Error(`Registry not found at ${registryPath}. Run /repo-orch-init in the workspace first.`);
-  }
+  assertRegistry(cwd);
 
   const runQuery = async () => {
     let report = '';

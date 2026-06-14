@@ -15,6 +15,10 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { RepoEntrySchema, formatZodError, type Registry, type RepoEntry } from './registry.js';
+import { isReadOnlyMode, toolAllowed } from './policy.js';
+
+const READ_ONLY = isReadOnlyMode();
 
 // ── Registry helpers ─────────────────────────────────────────────────────────
 
@@ -91,8 +95,8 @@ const RegisterEntrySchema = z.object({ entry: z.record(z.unknown()) });
 const FindKeywordsSchema = z.object({ keywords: z.array(z.string()) });
 const GetRepoSchema = z.object({ name: z.string() });
 
-type RepoEntry = { name: string; agentType: string; languages: string[]; owns: string[]; endpoints: string[]; emits: string[]; consumes: string[] };
-type Registry = { repos: Array<Record<string, unknown>>; generatedAt: string };
+// RepoEntry / Registry types and validation come from ./registry (the single
+// zod source of truth, kept in parity with schemas/registry.schema.json).
 
 function handleListRepos(): string {
   const registry = loadRegistry() as { repos: RepoEntry[] };
@@ -112,29 +116,37 @@ function handleGetRepoContext(args: unknown): string {
 function handleUpdateRepoContext(args: unknown): string {
   const { name, patch } = UpdatePatchSchema.parse(args);
   const registry = loadRegistry() as Registry;
-  const idx = registry.repos.findIndex(r => r['name'] === name);
+  const idx = registry.repos.findIndex(r => r.name === name);
   if (idx === -1) throw new Error(`Repo "${name}" not found in registry.`);
-  registry.repos[idx] = { ...registry.repos[idx], ...patch, userEdited: true };
+  // Validate the *merged* entry — a patch must leave the entry schema-valid.
+  const merged = { ...registry.repos[idx], ...patch, userEdited: true };
+  const parsed = RepoEntrySchema.safeParse(merged);
+  if (!parsed.success) {
+    throw new Error(`Patch would make repo "${name}" invalid: ${formatZodError(parsed.error)}`);
+  }
+  registry.repos[idx] = parsed.data;
   saveRegistry(registry);
   return `Updated repo "${name}" in registry.`;
 }
 
 function handleRegisterAgent(args: unknown): string {
   const { entry } = RegisterEntrySchema.parse(args);
-  const registry = loadRegistry() as Registry;
-  const name = entry['name'];
-  if (typeof name !== 'string' || name.trim() === '') {
-    throw new Error('entry.name is required and must be a non-empty string.');
+  // Full schema validation — registry writes must conform to registry.schema.json.
+  const parsed = RepoEntrySchema.safeParse(entry);
+  if (!parsed.success) {
+    throw new Error(`Invalid repo entry: ${formatZodError(parsed.error)}`);
   }
-  const idx = registry.repos.findIndex(r => r['name'] === name);
+  const repo: RepoEntry = parsed.data;
+  const registry = loadRegistry() as Registry;
+  const idx = registry.repos.findIndex(r => r.name === repo.name);
   if (idx >= 0) {
-    registry.repos[idx] = entry as Record<string, unknown>;
+    registry.repos[idx] = repo;
   } else {
-    registry.repos.push(entry as Record<string, unknown>);
+    registry.repos.push(repo);
   }
   registry.generatedAt = new Date().toISOString();
   saveRegistry(registry);
-  return `Registered agent for repo "${name}".`;
+  return `Registered agent for repo "${repo.name}".`;
 }
 
 function handleFindOwningRepos(args: unknown): string {
@@ -165,11 +177,18 @@ const server = new Server(
   { capabilities: { tools: {} } },
 );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
+// In read-only mode, write tools are not advertised at all.
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: tools.filter(t => toolAllowed(t.name, READ_ONLY)),
+}));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   try {
+    // Defense in depth: reject write tools in read-only mode even if called directly.
+    if (!toolAllowed(name, READ_ONLY)) {
+      throw new Error(`Tool "${name}" is disabled in read-only mode (REPO_ORCH_READONLY).`);
+    }
     let result: string;
     switch (name) {
       case 'list_repos':           result = handleListRepos(); break;

@@ -6,12 +6,13 @@
  * Exit code 0 on success, 1 on error (commands fall back to Tier-0 on any non-zero exit).
  */
 
-import { readFileSync, existsSync, statSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import { join, extname } from 'path';
 import { createHash } from 'crypto';
 import { execFileSync } from 'child_process';
 import fg from 'fast-glob';
 import { z } from 'zod';
+import { safeReadFile } from './paths.js';
 
 // ── Output schema ────────────────────────────────────────────────────────────
 
@@ -59,10 +60,12 @@ function detectLanguages(files: string[]): string[] {
 function detectFrameworks(repoPath: string): string[] {
   const frameworks: string[] = [];
 
-  const pkgPath = join(repoPath, 'package.json');
-  if (existsSync(pkgPath)) {
+  // All reads go through safeReadFile — symlinks/`..` escaping the repo root
+  // return null and are skipped (see paths.ts).
+  const pkgRaw = safeReadFile(repoPath, 'package.json');
+  if (pkgRaw) {
     try {
-      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
+      const pkg = JSON.parse(pkgRaw) as {
         dependencies?: Record<string, string>;
         devDependencies?: Record<string, string>;
       };
@@ -78,40 +81,23 @@ function detectFrameworks(repoPath: string): string[] {
     } catch { /* malformed package.json — skip */ }
   }
 
-  const csprojFiles = fg.sync('*.csproj', { cwd: repoPath, deep: 1 });
+  const csprojFiles = fg.sync('*.csproj', { cwd: repoPath, deep: 1, followSymbolicLinks: false });
   if (csprojFiles.length > 0) {
-    try {
-      const content = readFileSync(join(repoPath, csprojFiles[0]), 'utf8');
-      if (content.includes('Microsoft.AspNetCore')) frameworks.push('ASP.NET Core');
-    } catch { /* unreadable — skip */ }
+    const content = safeReadFile(repoPath, csprojFiles[0]);
+    if (content && content.includes('Microsoft.AspNetCore')) frameworks.push('ASP.NET Core');
   }
 
-  const pomPath = join(repoPath, 'pom.xml');
-  if (existsSync(pomPath)) {
-    try {
-      const content = readFileSync(pomPath, 'utf8');
-      if (content.includes('spring-boot')) frameworks.push('Spring Boot');
-    } catch { /* unreadable — skip */ }
+  const pomContent = safeReadFile(repoPath, 'pom.xml');
+  if (pomContent && pomContent.includes('spring-boot')) frameworks.push('Spring Boot');
+
+  const goModContent = safeReadFile(repoPath, 'go.mod');
+  if (goModContent) {
+    if (goModContent.includes('gin-gonic/gin')) frameworks.push('Gin');
+    if (goModContent.includes('labstack/echo')) frameworks.push('Echo');
+    if (goModContent.includes('gofiber/fiber')) frameworks.push('Fiber');
   }
 
-  const goModPath = join(repoPath, 'go.mod');
-  if (existsSync(goModPath)) {
-    try {
-      const content = readFileSync(goModPath, 'utf8');
-      if (content.includes('gin-gonic/gin')) frameworks.push('Gin');
-      if (content.includes('labstack/echo')) frameworks.push('Echo');
-      if (content.includes('gofiber/fiber')) frameworks.push('Fiber');
-    } catch { /* unreadable — skip */ }
-  }
-
-  let pyContent = '';
-  const pyprojectPath = join(repoPath, 'pyproject.toml');
-  const requirementsPath = join(repoPath, 'requirements.txt');
-  if (existsSync(pyprojectPath)) {
-    try { pyContent = readFileSync(pyprojectPath, 'utf8'); } catch { /* skip */ }
-  } else if (existsSync(requirementsPath)) {
-    try { pyContent = readFileSync(requirementsPath, 'utf8'); } catch { /* skip */ }
-  }
+  const pyContent = safeReadFile(repoPath, 'pyproject.toml') ?? safeReadFile(repoPath, 'requirements.txt') ?? '';
   if (pyContent.includes('fastapi')) frameworks.push('FastAPI');
   if (pyContent.includes('django')) frameworks.push('Django');
   if (pyContent.includes('flask')) frameworks.push('Flask');
@@ -215,7 +201,7 @@ const ENTRY_PATTERNS = [
 async function findEntryPoints(repoPath: string): Promise<string[]> {
   const found: string[] = [];
   for (const pattern of ENTRY_PATTERNS) {
-    const matches = await fg(pattern, { cwd: repoPath, deep: 1, absolute: false });
+    const matches = await fg(pattern, { cwd: repoPath, deep: 1, absolute: false, followSymbolicLinks: false });
     found.push(...matches.filter(f => !f.includes('test') && !f.includes('spec')));
     if (found.length >= 3) break;
   }
@@ -241,6 +227,7 @@ async function main(): Promise<void> {
     ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**', '**/vendor/**', '**/__pycache__/**'],
     dot: false,
     onlyFiles: true,
+    followSymbolicLinks: false,
   });
 
   const languages = detectLanguages(allFiles);
@@ -257,6 +244,7 @@ async function main(): Promise<void> {
     ignore: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
     onlyFiles: true,
     deep: 5,
+    followSymbolicLinks: false,
   });
 
   const endpoints: string[] = [];
@@ -264,13 +252,13 @@ async function main(): Promise<void> {
   const consumeSet = new Set<string>();
 
   for (const relFile of interestingFiles.slice(0, 10)) {
-    try {
-      const content = readFileSync(join(repoPath, relFile), 'utf8');
-      endpoints.push(...extractEndpoints(content));
-      const { emits, consumes } = extractEvents(content);
-      emits.forEach(e => emitSet.add(e));
-      consumes.forEach(e => consumeSet.add(e));
-    } catch { /* unreadable file — skip */ }
+    // safeReadFile returns null for files that escape the repo root (symlink/`..`).
+    const content = safeReadFile(repoPath, relFile);
+    if (content === null) continue;
+    endpoints.push(...extractEndpoints(content));
+    const { emits, consumes } = extractEvents(content);
+    emits.forEach(e => emitSet.add(e));
+    consumes.forEach(e => consumeSet.add(e));
   }
 
   const fingerprint = computeFingerprint(repoPath, allFiles.length);

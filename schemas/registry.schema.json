@@ -71,21 +71,25 @@
           "owns": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Routing keywords / domain areas this repo owns."
+            "maxItems": 100,
+            "description": "Routing keywords / domain areas this repo owns. Bounded (maxItems) to limit routing-poisoning via keyword-stuffing."
           },
           "endpoints": {
             "type": "array",
             "items": { "type": "string" },
+            "maxItems": 100,
             "description": "HTTP endpoints exposed, e.g. ['POST /login']."
           },
           "emits": {
             "type": "array",
             "items": { "type": "string" },
+            "maxItems": 100,
             "description": "Events this repo emits."
           },
           "consumes": {
             "type": "array",
             "items": { "type": "string" },
+            "maxItems": 100,
             "description": "Events this repo subscribes to from other services."
           },
           "dependsOn": {
