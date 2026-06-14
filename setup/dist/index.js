@@ -2787,7 +2787,7 @@ function create$(options) {
 var $ = create$();
 
 // src/index.ts
-import { existsSync, readFileSync as readFileSync2, writeFileSync, mkdirSync, readdirSync, statSync } from "fs";
+import { existsSync as existsSync2, readFileSync as readFileSync3, writeFileSync, mkdirSync, readdirSync, statSync } from "fs";
 import { join as join2 } from "path";
 
 // node_modules/@clack/core/dist/index.mjs
@@ -3328,6 +3328,7 @@ function me() {
 
 // src/lib.ts
 import { join } from "path";
+import { existsSync, readFileSync as readFileSync2 } from "fs";
 function semverGte(ver, min) {
   const parse = (v2) => v2.split(".").map(Number);
   const [ma, mi, pa] = parse(ver);
@@ -3355,6 +3356,38 @@ function withMcpServer(settings, serverPath = MCP_SERVER_REL_PATH) {
 function hasMcpServer(settings) {
   const servers = settings["mcpServers"];
   return Boolean(servers && servers["repo-orchestrator"]);
+}
+function checkWorkspaceHealth(cwd) {
+  const checks = [];
+  const regPath = join(cwd, ".repo-orchestrator", "registry.json");
+  if (!existsSync(regPath)) {
+    checks.push({ label: "registry.json", ok: false, detail: "not found \u2014 run /repo-orch-init" });
+    return { ok: false, checks };
+  }
+  let registry;
+  try {
+    registry = JSON.parse(readFileSync2(regPath, "utf8"));
+  } catch {
+    checks.push({ label: "registry.json", ok: false, detail: "present but not valid JSON" });
+    return { ok: false, checks };
+  }
+  const repos = Array.isArray(registry.repos) ? registry.repos : [];
+  checks.push({
+    label: "registry.json",
+    ok: repos.length > 0,
+    detail: repos.length > 0 ? `${repos.length} repo(s) registered` : "no repos registered"
+  });
+  for (const r2 of repos) {
+    const name = typeof r2.name === "string" ? r2.name : "(unnamed)";
+    const ctx = existsSync(join(cwd, ".repo-orchestrator", "context", `${name}.md`));
+    const agent = existsSync(join(cwd, ".claude", "agents", `repo-${name}.md`));
+    checks.push({
+      label: `repo ${name}`,
+      ok: ctx && agent,
+      detail: `${ctx ? "\u2713" : "\u2717"} context   ${agent ? "\u2713" : "\u2717"} agent`
+    });
+  }
+  return { ok: checks.every((c) => c.ok), checks };
 }
 
 // src/index.ts
@@ -3394,9 +3427,9 @@ async function runScan(cwd) {
   const settingsPath = join2(cwd, ".claude", "settings.json");
   let atSettings = false;
   let settings = {};
-  if (existsSync(settingsPath)) {
+  if (existsSync2(settingsPath)) {
     try {
-      settings = JSON.parse(readFileSync2(settingsPath, "utf8"));
+      settings = JSON.parse(readFileSync3(settingsPath, "utf8"));
       atSettings = settings["env"]?.["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] === "1";
     } catch {
     }
@@ -3408,16 +3441,16 @@ async function runScan(cwd) {
   const npmVer = nodeVer ? await getVersion("npm") : "";
   const npm = !nodeVer ? { status: "SKIP", detail: "skipped (Node.js absent)" } : npmVer ? { status: "OK", detail: `v${npmVer}` } : { status: "MISSING", detail: "not found (required alongside Node.js)" };
   const pp = pluginPath(cwd);
-  const t1Built = existsSync(join2(pp, "indexer", "dist", "index.js"));
+  const t1Built = existsSync2(join2(pp, "indexer", "dist", "index.js"));
   const tier1 = t1Built ? { status: "OK", detail: "built \u2014 fast deterministic indexing active" } : nodeVer ? { status: "OPTIONAL", detail: "not built (Tier-0 fallback active)" } : { status: "SKIP", detail: "skipped (Node.js absent)" };
-  const t2Built = existsSync(join2(pp, "mcp", "dist", "server.js"));
+  const t2Built = existsSync2(join2(pp, "mcp", "dist", "server.js"));
   const tier2 = t2Built ? { status: "OK", detail: "built \u2014 live registry tools available" } : nodeVer ? { status: "OPTIONAL", detail: "not built (triage works without it)" } : { status: "SKIP", detail: "skipped (Node.js absent)" };
   const mcpWired = hasMcpServer(settings) ? { status: "OK", detail: "wired into .claude/settings.json" } : t2Built ? { status: "OPTIONAL", detail: "built but not wired" } : { status: "SKIP", detail: "skipped (MCP server not built)" };
   let gitDirs = [];
   try {
     gitDirs = readdirSync(cwd).filter((d3) => {
       try {
-        return statSync(join2(cwd, d3)).isDirectory() && existsSync(join2(cwd, d3, ".git"));
+        return statSync(join2(cwd, d3)).isDirectory() && existsSync2(join2(cwd, d3, ".git"));
       } catch {
         return false;
       }
@@ -3455,9 +3488,9 @@ function buildInstallTasks(r2, cwd) {
       const p2 = join2(dir, "settings.json");
       mkdirSync(dir, { recursive: true });
       let cfg = {};
-      if (existsSync(p2)) {
+      if (existsSync2(p2)) {
         try {
-          cfg = JSON.parse(readFileSync2(p2, "utf8"));
+          cfg = JSON.parse(readFileSync3(p2, "utf8"));
         } catch {
         }
       }
@@ -3475,7 +3508,7 @@ function buildInstallTasks(r2, cwd) {
     skip: () => r2.tier1.status !== "OPTIONAL",
     task: async () => {
       const dir = join2(pluginPath(cwd), "indexer");
-      if (!existsSync(dir))
+      if (!existsSync2(dir))
         throw new Error("Indexer directory not found at " + dir);
       await execa("npm", ["install", "--silent"], { cwd: dir });
       await execa("npm", ["run", "build", "--silent"], { cwd: dir });
@@ -3486,7 +3519,7 @@ function buildInstallTasks(r2, cwd) {
     skip: () => r2.tier2.status !== "OPTIONAL",
     task: async () => {
       const dir = join2(pluginPath(cwd), "mcp");
-      if (!existsSync(dir))
+      if (!existsSync2(dir))
         throw new Error("MCP directory not found at " + dir);
       await execa("npm", ["install", "--silent"], { cwd: dir });
       await execa("npm", ["run", "build", "--silent"], { cwd: dir });
@@ -3498,10 +3531,10 @@ function buildInstallTasks(r2, cwd) {
       if (!r2.nodejs.version)
         return true;
       const p2 = join2(cwd, ".claude", "settings.json");
-      if (!existsSync(p2))
+      if (!existsSync2(p2))
         return false;
       try {
-        return hasMcpServer(JSON.parse(readFileSync2(p2, "utf8")));
+        return hasMcpServer(JSON.parse(readFileSync3(p2, "utf8")));
       } catch {
         return false;
       }
@@ -3511,9 +3544,9 @@ function buildInstallTasks(r2, cwd) {
       const p2 = join2(dir, "settings.json");
       mkdirSync(dir, { recursive: true });
       let cfg = {};
-      if (existsSync(p2)) {
+      if (existsSync2(p2)) {
         try {
-          cfg = JSON.parse(readFileSync2(p2, "utf8"));
+          cfg = JSON.parse(readFileSync3(p2, "utf8"));
         } catch {
         }
       }
@@ -3541,6 +3574,21 @@ async function runTask(t) {
 }
 async function main() {
   const cwd = process.cwd();
+  if (process.argv.includes("--verify")) {
+    oe(source_default.cyan("repo-orchestrator \xB7 Health check"));
+    const report = checkWorkspaceHealth(cwd);
+    le(
+      report.checks.map((c) => `${c.ok ? source_default.green("\u2713") : source_default.red("\u2717")}  ${c.label.padEnd(24)} ${c.detail}`).join("\n"),
+      "Workspace readiness"
+    );
+    if (report.ok) {
+      $e(source_default.green("All checks passed \u2014 workspace is ready."));
+    } else {
+      $e(source_default.yellow("Some checks failed \u2014 see above. Run /repo-orch-init or /repo-orch-sync."));
+      process.exitCode = 1;
+    }
+    return;
+  }
   oe(source_default.cyan(`repo-orchestrator v${VERSION} \xB7 Setup`));
   let results;
   if (TTY) {
@@ -3599,9 +3647,9 @@ async function main() {
   }
   const settingsPath = join2(cwd, ".claude", "settings.json");
   let teamsActiveNow = process.env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] === "1";
-  if (!teamsActiveNow && existsSync(settingsPath)) {
+  if (!teamsActiveNow && existsSync2(settingsPath)) {
     try {
-      const cfg = JSON.parse(readFileSync2(settingsPath, "utf8"));
+      const cfg = JSON.parse(readFileSync3(settingsPath, "utf8"));
       teamsActiveNow = cfg?.env?.["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] === "1";
     } catch {
     }

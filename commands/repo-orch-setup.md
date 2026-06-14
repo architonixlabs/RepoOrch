@@ -179,3 +179,21 @@ Print:
 ```
 
 Then invoke `/repo-orch-init` immediately — the irreducible core that discovers repos and writes the registry + context. (Only reach this step when Agent Teams was already active, or when the user re-runs after restarting.)
+
+---
+
+## Step 6 — Verify readiness (deterministic, no LLM)
+
+After `/repo-orch-init` finishes registering, confirm the workspace is actually wired up — a fast, deterministic check that spends no tokens:
+
+- **If the runner bundle is present**, run:
+
+  ```bash
+  node .claude/plugins/repo-orchestrator/setup/dist/index.js --verify
+  ```
+
+  It checks that `registry.json` parses and that every registered repo has both its context file (`.repo-orchestrator/context/<name>.md`) and its agent file (`.claude/agents/repo-<name>.md`), printing a ✓/✗ per repo.
+
+- **Otherwise** (no Node), check the same files directly with `Read`/`Glob`: `registry.json` exists and parses, and each repo named in it has a context file and an agent file. Report any ✗ and point the user to `/repo-orch-init` (missing bootstrap) or `/repo-orch-sync` (drift).
+
+This is a readiness gate, not a triage — it never calls a model.

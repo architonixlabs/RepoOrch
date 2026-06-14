@@ -17,7 +17,7 @@ import { execa } from 'execa';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import * as p from '@clack/prompts';
-import { semverGte, pluginPath, withMcpServer, hasMcpServer } from './lib.js';
+import { semverGte, pluginPath, withMcpServer, hasMcpServer, checkWorkspaceHealth } from './lib.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -241,6 +241,24 @@ async function runTask(t: InstallTask): Promise<void> {
 
 async function main(): Promise<void> {
   const cwd = process.cwd();
+
+  // Deterministic, no-LLM health check — `node dist/index.js --verify`.
+  if (process.argv.includes('--verify')) {
+    p.intro(chalk.cyan('repo-orchestrator · Health check'));
+    const report = checkWorkspaceHealth(cwd);
+    p.note(
+      report.checks.map(c => `${c.ok ? chalk.green('✓') : chalk.red('✗')}  ${c.label.padEnd(24)} ${c.detail}`).join('\n'),
+      'Workspace readiness',
+    );
+    if (report.ok) {
+      p.outro(chalk.green('All checks passed — workspace is ready.'));
+    } else {
+      p.outro(chalk.yellow('Some checks failed — see above. Run /repo-orch-init or /repo-orch-sync.'));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
   p.intro(chalk.cyan(`repo-orchestrator v${VERSION} · Setup`));
 
   let results: ScanResults;

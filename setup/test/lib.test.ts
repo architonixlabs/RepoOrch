@@ -2,8 +2,10 @@
  * Tests for the setup runner's pure helpers (src/lib.ts).
  */
 
-import { semverGte, pluginPath, withMcpServer, hasMcpServer, MCP_SERVER_REL_PATH } from '../src/lib.js';
+import { semverGte, pluginPath, withMcpServer, hasMcpServer, MCP_SERVER_REL_PATH, checkWorkspaceHealth } from '../src/lib.js';
 import { join } from 'node:path';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 describe('semverGte', () => {
   test('equal versions are >=', () => {
@@ -57,5 +59,46 @@ describe('withMcpServer / hasMcpServer', () => {
   test('is idempotent — re-applying changes nothing', () => {
     const once = withMcpServer({});
     expect(withMcpServer(once)).toEqual(once);
+  });
+});
+
+describe('checkWorkspaceHealth', () => {
+  const mkWorkspace = () => mkdtempSync(join(tmpdir(), 'ro-health-'));
+
+  test('fails when no registry exists', () => {
+    const r = checkWorkspaceHealth(mkWorkspace());
+    expect(r.ok).toBe(false);
+    expect(r.checks[0].detail).toMatch(/not found/);
+  });
+
+  test('fails on invalid registry JSON', () => {
+    const ws = mkWorkspace();
+    mkdirSync(join(ws, '.repo-orchestrator'), { recursive: true });
+    writeFileSync(join(ws, '.repo-orchestrator', 'registry.json'), '{ not json');
+    const r = checkWorkspaceHealth(ws);
+    expect(r.ok).toBe(false);
+    expect(r.checks[0].detail).toMatch(/not valid JSON/);
+  });
+
+  test('passes when registry + context + agent files all exist', () => {
+    const ws = mkWorkspace();
+    mkdirSync(join(ws, '.repo-orchestrator', 'context'), { recursive: true });
+    mkdirSync(join(ws, '.claude', 'agents'), { recursive: true });
+    writeFileSync(join(ws, '.repo-orchestrator', 'registry.json'), JSON.stringify({ repos: [{ name: 'auth-service' }] }));
+    writeFileSync(join(ws, '.repo-orchestrator', 'context', 'auth-service.md'), '#');
+    writeFileSync(join(ws, '.claude', 'agents', 'repo-auth-service.md'), '#');
+    const r = checkWorkspaceHealth(ws);
+    expect(r.ok).toBe(true);
+  });
+
+  test('flags a repo missing its agent file', () => {
+    const ws = mkWorkspace();
+    mkdirSync(join(ws, '.repo-orchestrator', 'context'), { recursive: true });
+    writeFileSync(join(ws, '.repo-orchestrator', 'registry.json'), JSON.stringify({ repos: [{ name: 'payments' }] }));
+    writeFileSync(join(ws, '.repo-orchestrator', 'context', 'payments.md'), '#');
+    const r = checkWorkspaceHealth(ws);
+    expect(r.ok).toBe(false);
+    const repoCheck = r.checks.find(c => c.label.includes('payments'));
+    expect(repoCheck?.detail).toMatch(/✗ agent/);
   });
 });

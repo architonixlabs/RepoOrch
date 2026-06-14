@@ -6,6 +6,7 @@
  */
 
 import { join } from 'path';
+import { existsSync, readFileSync } from 'fs';
 
 /**
  * Compare two semver strings: is `ver` >= `min`?
@@ -52,4 +53,50 @@ export function withMcpServer(
 export function hasMcpServer(settings: Record<string, unknown>): boolean {
   const servers = settings['mcpServers'] as Record<string, unknown> | undefined;
   return Boolean(servers && servers['repo-orchestrator']);
+}
+
+export interface HealthCheck { label: string; ok: boolean; detail: string; }
+export interface HealthReport { ok: boolean; checks: HealthCheck[]; }
+
+/**
+ * Deterministic, no-LLM readiness check for a bootstrapped workspace. Reads
+ * (never writes) the registry and verifies each repo has its context + agent
+ * file. Used by the setup runner's `--verify` mode and is safe to run anytime.
+ */
+export function checkWorkspaceHealth(cwd: string): HealthReport {
+  const checks: HealthCheck[] = [];
+  const regPath = join(cwd, '.repo-orchestrator', 'registry.json');
+
+  if (!existsSync(regPath)) {
+    checks.push({ label: 'registry.json', ok: false, detail: 'not found — run /repo-orch-init' });
+    return { ok: false, checks };
+  }
+
+  let registry: { repos?: Array<{ name?: unknown }> };
+  try {
+    registry = JSON.parse(readFileSync(regPath, 'utf8'));
+  } catch {
+    checks.push({ label: 'registry.json', ok: false, detail: 'present but not valid JSON' });
+    return { ok: false, checks };
+  }
+
+  const repos = Array.isArray(registry.repos) ? registry.repos : [];
+  checks.push({
+    label: 'registry.json',
+    ok: repos.length > 0,
+    detail: repos.length > 0 ? `${repos.length} repo(s) registered` : 'no repos registered',
+  });
+
+  for (const r of repos) {
+    const name = typeof r.name === 'string' ? r.name : '(unnamed)';
+    const ctx = existsSync(join(cwd, '.repo-orchestrator', 'context', `${name}.md`));
+    const agent = existsSync(join(cwd, '.claude', 'agents', `repo-${name}.md`));
+    checks.push({
+      label: `repo ${name}`,
+      ok: ctx && agent,
+      detail: `${ctx ? '✓' : '✗'} context   ${agent ? '✓' : '✗'} agent`,
+    });
+  }
+
+  return { ok: checks.every((c) => c.ok), checks };
 }
