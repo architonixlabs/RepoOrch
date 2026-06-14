@@ -1,19 +1,28 @@
 #!/usr/bin/env node
+/**
+ * repo-orchestrator setup runner.
+ *
+ * Invoked two ways:
+ *  - by `/repo-orch-setup` via Claude's Bash tool — NON-interactive (no TTY):
+ *    scans, auto-installs optional components, prints guidance.
+ *  - directly in a human's terminal (TTY): a polished @clack/prompts wizard with
+ *    a component multiselect and spinners.
+ *
+ * Shipped as a single dependency-free bundle (esbuild) at dist/index.js, so it
+ * runs on a fresh install with only `node` — no `npm install` required.
+ */
+
 import chalk from 'chalk';
 import { execa } from 'execa';
-import { Listr, ListrTaskWrapper, ListrRenderer } from 'listr2';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { resolve, join } from 'path';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
+import * as p from '@clack/prompts';
+import { semverGte, pluginPath, withMcpServer, hasMcpServer } from './lib.js';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 type Status = 'OK' | 'OPTIONAL' | 'OLD' | 'MISSING' | 'SKIP';
-
-interface CheckResult {
-  status: Status;
-  detail: string;
-}
-
+interface CheckResult { status: Status; detail: string; }
 interface ScanResults {
   claudeCode: CheckResult;
   agentTeams: CheckResult;
@@ -21,23 +30,27 @@ interface ScanResults {
   npm: CheckResult;
   tier1: CheckResult;
   tier2: CheckResult;
+  mcpWired: CheckResult;
   workspace: CheckResult & { count: number; names: string[] };
 }
+
+const VERSION = '0.3.0';
+const TTY = Boolean(process.stdout.isTTY);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const FIX_HINTS: Record<string, string> = {
   'Agent Teams': 'Create .claude/settings.json with { "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" } }',
-  'Tier-1 indexer':  'Run: cd .claude/plugins/repo-orchestrator/indexer && npm install && npm run build',
+  'Tier-1 indexer': 'Run: cd .claude/plugins/repo-orchestrator/indexer && npm install && npm run build',
   'Tier-2 MCP server': 'Run: cd .claude/plugins/repo-orchestrator/mcp && npm install && npm run build',
 };
 
-const icon = (s: Status) => {
+const icon = (s: Status): string => {
   switch (s) {
-    case 'OK':       return chalk.green('✓');
+    case 'OK': return chalk.green('✓');
     case 'OPTIONAL': return chalk.yellow('○');
-    case 'SKIP':     return chalk.dim('─');
-    default:         return chalk.red('✗');
+    case 'SKIP': return chalk.dim('─');
+    default: return chalk.red('✗');
   }
 };
 
@@ -52,23 +65,9 @@ async function getVersion(cmd: string, args: string[] = ['--version']): Promise<
   }
 }
 
-function semverGte(ver: string, min: string): boolean {
-  const parse = (v: string) => v.split('.').map(Number);
-  const [ma, mi, pa] = parse(ver);
-  const [mb, mib, pb] = parse(min);
-  if (ma !== mb) return ma > mb;
-  if (mi !== mib) return mi > mib;
-  return pa >= pb;
-}
-
-function pluginPath(workspace: string): string {
-  return join(workspace, '.claude', 'plugins', 'repo-orchestrator');
-}
-
 // ─── Scan ─────────────────────────────────────────────────────────────────────
 
 async function runScan(cwd: string): Promise<ScanResults> {
-  // Claude Code
   const ccVer = await getVersion('claude');
   const claudeCode: CheckResult = ccVer
     ? semverGte(ccVer, '2.1.32')
@@ -76,21 +75,20 @@ async function runScan(cwd: string): Promise<ScanResults> {
       : { status: 'OLD', detail: `v${ccVer} — needs 2.1.32+ for Agent Teams` }
     : { status: 'MISSING', detail: 'not found on PATH' };
 
-  // Agent Teams
   const atEnv = process.env['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'] === '1';
   const settingsPath = join(cwd, '.claude', 'settings.json');
   let atSettings = false;
+  let settings: Record<string, unknown> = {};
   if (existsSync(settingsPath)) {
     try {
-      const cfg = JSON.parse(readFileSync(settingsPath, 'utf8'));
-      atSettings = cfg?.env?.['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'] === '1';
+      settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      atSettings = (settings['env'] as Record<string, string> | undefined)?.['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'] === '1';
     } catch { /* ignore */ }
   }
   const agentTeams: CheckResult = atEnv || atSettings
     ? { status: 'OK', detail: 'enabled' }
     : { status: 'OPTIONAL', detail: 'not set — multi-repo deliberation inactive' };
 
-  // Node.js
   const nodeVer = await getVersion('node');
   const nodeMajor = nodeVer ? parseInt(nodeVer.split('.')[0], 10) : 0;
   const nodejs: CheckResult & { version: string } = !nodeVer
@@ -99,7 +97,6 @@ async function runScan(cwd: string): Promise<ScanResults> {
       ? { status: 'OK', detail: `v${nodeVer}`, version: nodeVer }
       : { status: 'OLD', detail: `v${nodeVer} — needs 18+ for Tier-1/2`, version: nodeVer };
 
-  // npm
   const npmVer = nodeVer ? await getVersion('npm') : '';
   const npm: CheckResult = !nodeVer
     ? { status: 'SKIP', detail: 'skipped (Node.js absent)' }
@@ -107,100 +104,85 @@ async function runScan(cwd: string): Promise<ScanResults> {
       ? { status: 'OK', detail: `v${npmVer}` }
       : { status: 'MISSING', detail: 'not found (required alongside Node.js)' };
 
-  // Tier-1 indexer
   const pp = pluginPath(cwd);
   const t1Built = existsSync(join(pp, 'indexer', 'dist', 'index.js'));
   const tier1: CheckResult = t1Built
     ? { status: 'OK', detail: 'built — fast deterministic indexing active' }
-    : nodeVer
-      ? { status: 'OPTIONAL', detail: 'not built (Tier-0 fallback active)' }
+    : nodeVer ? { status: 'OPTIONAL', detail: 'not built (Tier-0 fallback active)' }
       : { status: 'SKIP', detail: 'skipped (Node.js absent)' };
 
-  // Tier-2 MCP server
   const t2Built = existsSync(join(pp, 'mcp', 'dist', 'server.js'));
   const tier2: CheckResult = t2Built
     ? { status: 'OK', detail: 'built — live registry tools available' }
-    : nodeVer
-      ? { status: 'OPTIONAL', detail: 'not built (triage works without it)' }
+    : nodeVer ? { status: 'OPTIONAL', detail: 'not built (triage works without it)' }
       : { status: 'SKIP', detail: 'skipped (Node.js absent)' };
 
-  // Workspace layout
+  const mcpWired: CheckResult = hasMcpServer(settings)
+    ? { status: 'OK', detail: 'wired into .claude/settings.json' }
+    : t2Built ? { status: 'OPTIONAL', detail: 'built but not wired' }
+      : { status: 'SKIP', detail: 'skipped (MCP server not built)' };
+
   let gitDirs: string[] = [];
   try {
-    const { readdirSync, statSync } = await import('fs');
-    gitDirs = readdirSync(cwd)
-      .filter(d => {
-        try { return statSync(join(cwd, d)).isDirectory() && existsSync(join(cwd, d, '.git')); }
-        catch { return false; }
-      });
+    gitDirs = readdirSync(cwd).filter(d => {
+      try { return statSync(join(cwd, d)).isDirectory() && existsSync(join(cwd, d, '.git')); }
+      catch { return false; }
+    });
   } catch { /* ignore */ }
   const workspace: CheckResult & { count: number; names: string[] } = gitDirs.length
     ? { status: 'OK', detail: `${gitDirs.length} repo(s): ${gitDirs.join(', ')}`, count: gitDirs.length, names: gitDirs }
     : { status: 'MISSING', detail: 'no git repos found as immediate subdirectories', count: 0, names: [] };
 
-  return { claudeCode, agentTeams, nodejs, npm, tier1, tier2, workspace };
+  return { claudeCode, agentTeams, nodejs, npm, tier1, tier2, mcpWired, workspace };
 }
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
-
-function printDashboard(r: ScanResults): void {
-  const row = (label: string, res: CheckResult) =>
-    `  ${icon(res.status)}  ${label.padEnd(22)} ${res.detail}`;
-
-  const sep = chalk.dim('  ' + '─'.repeat(62));
-
-  console.log(chalk.bold('\n  Environment Check'));
-  console.log(sep);
-  console.log(chalk.dim('  Component              Detail'));
-  console.log(sep);
-  console.log(row('Claude Code', r.claudeCode));
-  console.log(row('Agent Teams', r.agentTeams));
-  console.log(sep);
-  console.log(row('Node.js', r.nodejs));
-  console.log(row('npm', r.npm));
-  console.log(sep);
-  console.log(row('Tier-1 indexer', r.tier1));
-  console.log(row('Tier-2 MCP server', r.tier2));
-  console.log(sep);
-  console.log(row('Workspace layout', r.workspace));
-  console.log(sep);
-  console.log(chalk.dim('\n  Legend:  ') +
-    chalk.green('✓ ready') + chalk.dim('   ') +
-    chalk.yellow('○ optional') + chalk.dim('   ') +
-    chalk.dim('─ skipped') + chalk.dim('   ') +
-    chalk.red('✗ action needed'));
+function renderDashboard(r: ScanResults): string {
+  const row = (label: string, res: CheckResult) => `${icon(res.status)}  ${label.padEnd(20)} ${res.detail}`;
+  return [
+    row('Claude Code', r.claudeCode),
+    // LLM backend is fixed by design — the plugin uses the current Claude Code
+    // session and connects to NO external or local model (no API key needed).
+    `${icon('OK')}  ${'LLM backend'.padEnd(20)} Claude Code session — no API key or local model needed`,
+    row('Agent Teams', r.agentTeams),
+    row('Node.js', r.nodejs),
+    row('npm', r.npm),
+    row('Tier-1 indexer', r.tier1),
+    row('Tier-2 MCP server', r.tier2),
+    row('MCP wiring', r.mcpWired),
+    row('Workspace layout', r.workspace),
+    '',
+    chalk.dim('✓ ready   ○ optional   ─ skipped   ✗ action needed'),
+  ].join('\n');
 }
 
 // ─── Install tasks ────────────────────────────────────────────────────────────
 
-function buildInstallTasks(r: ScanResults, cwd: string) {
-  const tasks: Array<{ title: string; task: () => Promise<void>; skip: () => boolean }> = [];
+interface InstallTask { title: string; task: () => Promise<void>; skip: () => boolean; }
 
-  // Agent Teams
+function buildInstallTasks(r: ScanResults, cwd: string): InstallTask[] {
+  const tasks: InstallTask[] = [];
+
   tasks.push({
-    title: 'Agent Teams  →  write .claude/settings.json',
+    title: 'Enable Agent Teams (.claude/settings.json)',
     skip: () => r.agentTeams.status === 'OK',
     task: async () => {
       const dir = join(cwd, '.claude');
-      const p = join(dir, 'settings.json');
+      const p2 = join(dir, 'settings.json');
       mkdirSync(dir, { recursive: true });
       let cfg: Record<string, unknown> = {};
-      if (existsSync(p)) {
-        try { cfg = JSON.parse(readFileSync(p, 'utf8')); } catch { /* start fresh */ }
-      }
+      if (existsSync(p2)) { try { cfg = JSON.parse(readFileSync(p2, 'utf8')); } catch { /* fresh */ } }
       const env = (cfg['env'] as Record<string, string> | undefined) ?? {};
       env['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'] = '1';
       cfg['env'] = env;
       const exp = (cfg['experimental'] as Record<string, unknown> | undefined) ?? {};
       exp['teammateMode'] = true;
       cfg['experimental'] = exp;
-      writeFileSync(p, JSON.stringify(cfg, null, 2) + '\n');
+      writeFileSync(p2, JSON.stringify(cfg, null, 2) + '\n');
     },
   });
 
-  // Tier-1 indexer
   tasks.push({
-    title: 'Tier-1 indexer  →  npm install + build',
+    title: 'Build Tier-1 indexer (npm install + build)',
     skip: () => r.tier1.status !== 'OPTIONAL',
     task: async () => {
       const dir = join(pluginPath(cwd), 'indexer');
@@ -210,9 +192,8 @@ function buildInstallTasks(r: ScanResults, cwd: string) {
     },
   });
 
-  // Tier-2 MCP server
   tasks.push({
-    title: 'Tier-2 MCP server  →  npm install + build',
+    title: 'Build Tier-2 MCP server (npm install + build)',
     skip: () => r.tier2.status !== 'OPTIONAL',
     task: async () => {
       const dir = join(pluginPath(cwd), 'mcp');
@@ -222,142 +203,134 @@ function buildInstallTasks(r: ScanResults, cwd: string) {
     },
   });
 
+  tasks.push({
+    title: 'Wire MCP server into .claude/settings.json',
+    skip: () => {
+      if (!r.nodejs.version) return true;
+      const p2 = join(cwd, '.claude', 'settings.json');
+      if (!existsSync(p2)) return false;
+      try { return hasMcpServer(JSON.parse(readFileSync(p2, 'utf8'))); } catch { return false; }
+    },
+    task: async () => {
+      const dir = join(cwd, '.claude');
+      const p2 = join(dir, 'settings.json');
+      mkdirSync(dir, { recursive: true });
+      let cfg: Record<string, unknown> = {};
+      if (existsSync(p2)) { try { cfg = JSON.parse(readFileSync(p2, 'utf8')); } catch { /* fresh */ } }
+      writeFileSync(p2, JSON.stringify(withMcpServer(cfg), null, 2) + '\n');
+    },
+  });
+
   return tasks;
+}
+
+async function runTask(t: InstallTask): Promise<void> {
+  if (TTY) {
+    const s = p.spinner();
+    s.start(t.title);
+    try { await t.task(); s.stop(chalk.green(`✓ ${t.title}`)); }
+    catch (e) { s.stop(chalk.red(`✗ ${t.title}`)); throw e; }
+  } else {
+    p.log.step(t.title);
+    await t.task();
+    p.log.success(`done: ${t.title}`);
+  }
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-const VERSION = '0.3.0';
-const cwd = process.cwd();
+async function main(): Promise<void> {
+  const cwd = process.cwd();
+  p.intro(chalk.cyan(`repo-orchestrator v${VERSION} · Setup`));
 
-// Banner
-console.log(chalk.cyan('\n╔══════════════════════════════════════════════════════════════╗'));
-console.log(chalk.cyan('║') + chalk.bold(`   repo-orchestrator  v${VERSION}  ·  Setup & Installation         `) + chalk.cyan('║'));
-console.log(chalk.cyan('╚══════════════════════════════════════════════════════════════╝'));
-console.log(chalk.dim('\n  Steps:') +
-  chalk.cyan('  [1] Scan environment') +
-  chalk.dim('  [2] Install components') +
-  chalk.dim('  [3] Bootstrap'));
+  let results: ScanResults;
+  if (TTY) {
+    const s = p.spinner();
+    s.start('Scanning environment');
+    results = await runScan(cwd);
+    s.stop('Environment scanned');
+  } else {
+    p.log.step('Scanning environment…');
+    results = await runScan(cwd);
+  }
 
-// ── Step 1: Scan ──
-console.log(chalk.bold(chalk.cyan('\n  [1/3]')) + chalk.bold('  Scanning environment…'));
-console.log(chalk.dim('  ' + '─'.repeat(62)));
+  p.note(renderDashboard(results), 'Environment');
 
-const scanTasks = new Listr(
-  [
-    'Claude Code',
-    'Agent Teams',
-    'Node.js / npm',
-    'Tier-1 indexer',
-    'Tier-2 MCP server',
-    'Workspace layout',
-  ].map(label => ({
-    title: chalk.dim(`       Checking ${label}…`),
-    task: async (_ctx: unknown, task: ListrTaskWrapper<unknown, typeof ListrRenderer, typeof ListrRenderer>) => {
-      await new Promise(r => setTimeout(r, 0));
-      task.title = chalk.dim(`       ${label}`);
-    },
-  })),
-  { concurrent: false, renderer: 'simple' }
-);
+  // Only hard blocker.
+  if (results.workspace.status === 'MISSING') {
+    p.cancel('No git repositories found as immediate subdirectories. cd into your workspace root (its subdirectories should be your service repos) and re-run.');
+    process.exit(1);
+  }
 
-await scanTasks.run().catch(() => { /* harmless — just display tasks */ });
-
-const results = await runScan(cwd);
-
-// Dashboard
-printDashboard(results);
-
-// Blocker check
-if (results.workspace.status === 'MISSING') {
-  console.log(chalk.red('\n  ✗  No git repositories found in this directory.'));
-  console.log(chalk.dim('\n     repo-orchestrator expects each microservice to be an immediate'));
-  console.log(chalk.dim('     subdirectory with its own .git folder:\n'));
-  console.log(chalk.dim('       my-project/         ← run repo-orch-setup here'));
-  console.log(chalk.dim('       ├── auth-service/   ← git repo'));
-  console.log(chalk.dim('       ├── payments/       ← git repo'));
-  console.log(chalk.dim('       └── notifications/  ← git repo'));
-  console.log(chalk.dim('\n     Please cd into your workspace root and run again.\n'));
-  process.exit(1);
-}
-
-console.log(chalk.green('\n  Scan complete.'));
-
-// ── Step 2: Install ──
-const installTasks = buildInstallTasks(results, cwd);
-const pending = installTasks.filter(t => !t.skip());
-
-if (pending.length > 0) {
-  console.log(chalk.bold(chalk.cyan('\n  [2/3]')) + chalk.bold('  Installing optional components…'));
-  console.log(chalk.dim('  ' + '─'.repeat(62)));
-
-  const listrInstall = new Listr(
-    installTasks.map((t, i) => ({
-      title: `  (2${String.fromCharCode(97 + i)}/3)  ${t.title}`,
-      skip: t.skip,
-      task: t.task,
-    })),
-    {
-      concurrent: false,
-      renderer: 'default',
-      rendererOptions: {
-        collapseSubtasks: false,
-        collapseErrors: false,
-      },
-    }
+  // Transparency — say exactly what will change.
+  p.note(
+    [
+      'create / update  .claude/settings.json   (Agent Teams; MCP wiring if built)',
+      'build optional tiers (indexer, MCP)        (only if Node 18+; failures are non-fatal)',
+      'then  /repo-orch-init                      (discover repos → registry + context)',
+      '',
+      chalk.dim('Never modifies your service repos\' code; never commits, pushes, or deletes.'),
+    ].join('\n'),
+    'Setup will',
   );
 
-  const installErrors: Array<{ title: string; message: string }> = [];
-  await listrInstall.run().catch((err: unknown) => {
-    if (err && typeof err === 'object' && 'errors' in err) {
-      const errs = (err as { errors: Array<{ message: string }> }).errors;
-      errs.forEach((e, i) => {
-        const taskTitle = installTasks[i]?.title ?? 'unknown task';
-        installErrors.push({ title: taskTitle, message: e.message });
-      });
-    }
-  });
+  const pending = buildInstallTasks(results, cwd).filter(t => !t.skip());
+  let chosen = pending;
 
-  if (installErrors.length > 0) {
-    console.log(chalk.yellow('\n  Some components could not be installed automatically:'));
-    const sep = chalk.dim('  ' + '─'.repeat(62));
-    console.log(sep);
-    for (const { title, message } of installErrors) {
-      const component = Object.keys(FIX_HINTS).find(k => title.includes(k)) ?? title;
-      console.log(chalk.red(`\n  ✗  ${component}`));
-      console.log(chalk.dim(`     Error: ${message}`));
-      const hint = FIX_HINTS[component];
-      if (hint) console.log(chalk.cyan(`     Fix:   ${hint}`));
-    }
-    console.log(sep);
-    console.log(chalk.dim('\n  Fix the issues above, then re-run /repo-orch-setup.\n'));
-  } else {
-    console.log(chalk.green('\n  Component setup complete.'));
+  if (pending.length === 0) {
+    p.log.info('All optional components already installed — nothing to do.');
+  } else if (TTY) {
+    const sel = await p.multiselect({
+      message: 'Optional components to install (space to toggle, enter to confirm):',
+      options: pending.map((t, i) => ({ value: i, label: t.title })),
+      initialValues: pending.map((_, i) => i),
+      required: false,
+    });
+    if (p.isCancel(sel)) { p.cancel('Setup cancelled — no changes made.'); process.exit(0); }
+    chosen = (sel as number[]).map(i => pending[i]);
   }
-} else {
-  console.log(chalk.bold(chalk.cyan('\n  [2/3]')) + '  All optional components already installed — skipping.');
+
+  const errors: Array<{ title: string; message: string }> = [];
+  for (const t of chosen) {
+    try { await runTask(t); }
+    catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      errors.push({ title: t.title, message });
+      // Non-fatal: report and continue.
+      p.log.error(`${t.title} failed: ${message}`);
+      const hint = Object.keys(FIX_HINTS).find(k => t.title.includes(k));
+      if (hint) p.log.info(`Fix: ${FIX_HINTS[hint]}`);
+    }
+  }
+
+  // Re-scan agent-teams state cheaply from settings to decide the restart gate.
+  const settingsPath = join(cwd, '.claude', 'settings.json');
+  let teamsActiveNow = process.env['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'] === '1';
+  if (!teamsActiveNow && existsSync(settingsPath)) {
+    try {
+      const cfg = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      teamsActiveNow = (cfg?.env?.['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'] === '1');
+    } catch { /* ignore */ }
+  }
+
+  p.note(
+    [
+      `Workspace   ${chalk.white(cwd)}`,
+      `Repos       ${chalk.white(results.workspace.count + ': ' + results.workspace.names.join(', '))}`,
+      `Components  ${errors.length === 0 ? chalk.green('all requested installed') : chalk.yellow(errors.length + ' failed (non-fatal)')}`,
+    ].join('\n'),
+    'Summary',
+  );
+
+  // Restart gate — only when Agent Teams wasn't already active at session start.
+  if (results.agentTeams.status !== 'OK') {
+    p.outro(chalk.yellow('Agent Teams was just enabled — restart Claude Code, then run  /repo-orch-init  to bootstrap.'));
+  } else {
+    p.outro('Setup complete. Next:  /repo-orch-init');
+  }
 }
 
-// ── Summary ──
-const pp = pluginPath(cwd);
-const t1Active = existsSync(join(pp, 'indexer', 'dist', 'index.js'));
-const t2Active = existsSync(join(pp, 'mcp', 'dist', 'server.js'));
-const atEnabled = results.agentTeams.status === 'OK'
-  || (existsSync(join(cwd, '.claude', 'settings.json')) &&
-    (() => { try { return JSON.parse(readFileSync(join(cwd, '.claude', 'settings.json'), 'utf8'))?.env?.['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'] === '1'; } catch { return false; } })());
-
-const sep2 = chalk.dim('  ' + '─'.repeat(62));
-console.log(chalk.bold('\n  Summary'));
-console.log(sep2);
-console.log(`  ${'Workspace'.padEnd(14)} ${chalk.white(cwd)}`);
-console.log(`  ${'Repos found'.padEnd(14)} ${chalk.white(results.workspace.count + ': ' + results.workspace.names.join(', '))}`);
-console.log(`  ${'Agent Teams'.padEnd(14)} ${atEnabled ? chalk.green('enabled') : chalk.yellow('not enabled — restart Claude Code after setup')}`);
-console.log(`  ${'Knowledge'.padEnd(14)} ${chalk.dim('run /repo-orch-graph to build summaries (no API key needed)')}`);
-console.log(`  ${'Indexer'.padEnd(14)} ${t1Active ? chalk.green('Tier-1 active') : chalk.dim('Tier-0 fallback')}`);
-console.log(`  ${'MCP server'.padEnd(14)} ${t2Active ? chalk.green('Tier-2 active') : chalk.dim('not built')}`);
-console.log(sep2);
-
-// ── Step 3: Bootstrap ──
-console.log(chalk.bold(chalk.cyan('\n  [3/3]')) + chalk.bold('  Bootstrapping workspace…'));
-console.log(chalk.dim('  ' + '─'.repeat(62)));
-console.log(chalk.dim('  Handing off to /repo-orch-init…\n'));
+main().catch((err: unknown) => {
+  p.log.error(String(err));
+  process.exit(1);
+});

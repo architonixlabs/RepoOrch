@@ -38,6 +38,8 @@ Regular subagents can only report to their caller. **Agent Teams** (Claude Code 
 | **Node.js 18+** | Optional — only needed for the Tier-1 indexer and MCP server. The core Tier-0 path works without it. |
 | **Python 3.10+** | Optional — not required by any core feature. |
 
+> **No model to install.** All LLM work runs inside your current Claude Code session — the plugin connects to no external API and no local LLM, and there is no API key to configure.
+
 ---
 
 ## Install
@@ -141,7 +143,7 @@ What it does:
 /repo-orch-graph --rebuild    # force full rebuild after a major refactor
 ```
 
-Graphs are stored in `.repo-orchestrator/graphs/<name>/graph.json`. Once built, `/repo-orch-triage` automatically queries them before spawning specialists — each specialist receives a pre-fetched graph summary and reads raw source files only for details not covered by the graph. This can cut per-triage token use significantly on large codebases.
+Summaries are stored in `.repo-orchestrator/graphs/<name>/summary.json`. Once built, `/repo-orch-triage` automatically reads them before spawning specialists — each specialist receives a pre-fetched summary and reads raw source files only for details not covered by it. This can cut per-triage token use significantly on large codebases.
 
 ---
 
@@ -195,18 +197,22 @@ The `/repo-orch-graph` integration is the primary lever for reducing ongoing tok
 | Tier | What it adds | Requirement |
 | --- | --- | --- |
 | **Tier 0** | All core functionality via prompt-driven skills | None |
-| **Setup runner** | Rich `listr2` UI for `/repo-orch-setup` (progress steps, spinners, color) | Node.js 18+ |
+| **Setup runner** | Polished `@clack/prompts` wizard for `/repo-orch-setup` (TTY-aware; ships **prebuilt** — no build needed) | Node.js 18+ |
 | **Tier 1 — Indexer** | Faster, deterministic extraction | Node.js 18+ |
 | **Tier 2 — MCP server** | Live registry tools for the master agent | Node.js 18+ |
 | **Knowledge summaries** | Claude-native per-repo summaries that cut triage token cost | None — runs in session |
 
-### Build setup runner (rich UI)
+### Setup runner (ships prebuilt)
+
+The setup runner is shipped as a **self-contained, dependency-free bundle** at `setup/dist/index.js` (built with esbuild), so `/repo-orch-setup` can run it on a fresh install with only `node` — no `npm install`, no build step. It is **TTY-aware**: a polished `@clack/prompts` wizard (component multiselect, spinners) when a human runs it directly, and a non-interactive auto-install flow when Claude or CI invokes it.
+
+It is only ever an **optional accelerator** — the Claude-native `/repo-orch-setup` flow works identically without it.
+
+To rebuild it after changing `setup/src` (then re-commit the bundle):
 
 ```bash
 cd setup && npm install && npm run build
 ```
-
-The compiled runner is invoked automatically by `/repo-orch-setup` when it is present at `.claude/plugins/repo-orchestrator/setup/dist/index.js`. It uses `listr2` for live task-list progress and `chalk` for color output. Without it, the command falls back to plain text.
 
 ### Build Tier-1 indexer
 
@@ -245,10 +251,10 @@ Runs entirely within the Claude Code session — no Python, no API key, no exter
 
 ## Headless / CI usage (Agent SDK)
 
-`automation/repo-orch-triage_runner.mjs` exposes `runTriage()` for webhook handlers:
+`automation/triage_runner.mjs` exposes `runTriage()` for webhook handlers:
 
 ```javascript
-import { runTriage } from '.claude/plugins/repo-orchestrator/automation/repo-orch-triage_runner.mjs';
+import { runTriage } from '.claude/plugins/repo-orchestrator/automation/triage_runner.mjs';
 
 // In a GitHub/Jira webhook handler:
 const plan = await runTriage({
@@ -275,13 +281,14 @@ repo-orchestrator/
 ├── agents/
 │   └── repo-specialist-template.md Per-repo specialist (graph-first startup)
 ├── commands/
-│   ├── setup.md                    Interactive installer + prerequisite checker
-│   ├── init-context.md             Bootstrap: discover → index → graph → pause → register
-│   ├── sync-context.md             Drift detection + incremental graph update
-│   ├── edit-context.md             Guided context editing
-│   ├── graph-context.md            Build/refresh Claude-native knowledge summaries
-│   ├── triage.md                   Master controller (summary pre-load + agent team)
-│   └── deliberate.md               Adversarial root-cause mode
+│   ├── repo-orch-setup.md          Interactive installer + prerequisite checker
+│   ├── repo-orch-init.md           Bootstrap: discover → index → graph → pause → register
+│   ├── repo-orch-sync.md           Drift detection + incremental graph update
+│   ├── repo-orch-edit.md           Guided context editing
+│   ├── repo-orch-graph.md          Build/refresh Claude-native knowledge summaries
+│   ├── repo-orch-status.md         At-a-glance readiness dashboard
+│   ├── repo-orch-triage.md         Master controller (summary pre-load + agent team)
+│   └── repo-orch-deliberate.md     Adversarial root-cause mode
 ├── hooks/hooks.json                SessionStart registry check
 ├── schemas/
 │   ├── registry.schema.json        JSON Schema for registry.json
@@ -315,9 +322,9 @@ your-workspace/
 │   │   └── payments.md
 │   └── graphs/
 │       ├── auth-service/
-│       │   └── graph.json          Knowledge graph (built by /repo-orch-graph)
+│       │   └── summary.json        Knowledge summary (built by /repo-orch-graph)
 │       └── payments/
-│           └── graph.json
+│           └── summary.json
 └── .claude/
     ├── agents/
     │   ├── repo-auth-service.md    Generated specialist agent

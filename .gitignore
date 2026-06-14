@@ -6,6 +6,13 @@
 indexer/dist/
 mcp/dist/
 
+# Setup runner: ship ONLY the esbuild bundle (index.js); ignore stray tsc output.
+setup/dist/*
+!setup/dist/index.js
+
+# Knowledge graph (regenerated; rebuilt by post-commit hook)
+graphify-out/
+
 # Dependencies
 node_modules/
 indexer/node_modules/

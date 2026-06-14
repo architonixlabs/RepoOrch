@@ -1,57 +1,29 @@
 ---
 name: repo-orch-setup
-description: "First-time setup: prerequisite scan, component install, workspace bootstrap. Delegates to the compiled setup runner when available."
+description: "First-time setup: a no-build, zero-friction guided install — scans prerequisites, enables optional tiers, auto-wires settings (Agent Teams + MCP), then bootstraps. Works with no toolchain; the compiled runner is an optional accelerator, never required."
 ---
 
 # /repo-orch-setup
 
-First-time setup for repo-orchestrator. Run once from your workspace root.
+Guided first-time install for repo-orchestrator. Run once from your workspace root.
+
+**Design (read once):** this flow is **Claude-native and needs no build step** — it always works, even with no Node toolchain. Optional tiers (indexer, MCP server) *enhance* the experience but **never block** reaching a working state. The irreducible result of setup is a bootstrapped workspace via `/repo-orch-init`; everything else is progressive enhancement.
 
 ---
 
-## Step 1 — Try the compiled setup runner
+## Step 0 — Optional accelerator (skip if unsure)
 
-Check whether the compiled setup runner exists at `.claude/plugins/repo-orchestrator/setup/dist/index.js`.
-
-**If it exists**, run it with a single Bash call and let it handle everything — its output is the full UI:
+If a compiled setup runner is *already* built at `.claude/plugins/repo-orchestrator/setup/dist/index.js`, you MAY run it for a richer task-list UI:
 
 ```bash
 node .claude/plugins/repo-orchestrator/setup/dist/index.js
 ```
 
-After it exits, proceed to Step 4 (run `/repo-orch-init`). Do not run Steps 2–3.
-
-**If it does not exist**, continue with Steps 2–3 (the inline fallback).
+If you run it, skip to **Step 5** afterward. **If it is not present, do NOT build it just to run it — continue with the steps below.** They are the primary path and are fully sufficient. (The runner is only ever a convenience; it is never on the critical path to a working install.)
 
 ---
 
-## Step 2 — Print the welcome banner (fallback only)
-
-```text
-╔══════════════════════════════════════════════════════════════╗
-║   repo-orchestrator  v0.3.0  ·  Setup & Installation         ║
-╚══════════════════════════════════════════════════════════════╝
-
-  Steps:  [1] Scan environment  [2] Install components  [3] Bootstrap
-```
-
-Then print the scan checklist upfront:
-
-```text
-  ──────────────────────────────────────────────────────────────
-  [1/3]  Scanning environment…
-  ──────────────────────────────────────────────────────────────
-       Checking Claude Code…
-       Checking Agent Teams…
-       Checking Node.js / npm…
-       Checking Tier-1 indexer…
-       Checking Tier-2 MCP server…
-       Checking workspace layout…
-```
-
----
-
-## Step 3 — Run all checks in one Bash call (fallback only)
+## Step 1 — Scan environment (one Bash call)
 
 Execute this single Bash script. Capture the output — do not surface raw output to the user.
 
@@ -89,6 +61,11 @@ if [ -f "$pp/mcp/dist/server.js" ]; then t2_status="OK"; t2_detail="built"
 elif [ -n "$node_ver" ]; then t2_status="OPTIONAL"; t2_detail="not built"
 else t2_status="SKIP"; t2_detail="skipped"; fi
 
+mcp_wired=$(grep -os '"repo-orchestrator"' .claude/settings.json 2>/dev/null || echo "")
+if [ -n "$mcp_wired" ]; then mcp_status="OK"; mcp_detail="wired into settings.json"
+elif [ -f "$pp/mcp/dist/server.js" ]; then mcp_status="OPTIONAL"; mcp_detail="built but not wired"
+else mcp_status="SKIP"; mcp_detail="skipped"; fi
+
 git_count=0; git_names=""
 for d in */; do
   [ -d "${d}.git" ] && git_count=$((git_count+1)) && git_names="$git_names ${d%/}"
@@ -104,59 +81,101 @@ NODE_STATUS=$node_status|$node_detail
 NPM_STATUS=$npm_status|$npm_detail
 T1_STATUS=$t1_status|$t1_detail
 T2_STATUS=$t2_status|$t2_detail
+MCP_STATUS=$mcp_status|$mcp_detail
 WS_STATUS=$ws_status|$ws_detail
 WS_COUNT=$git_count
 WS_NAMES=$git_names
 EOF
 ```
 
-Parse each `KEY=status|detail` line. Map statuses to icons: `OK` → `✓`, `OPTIONAL` → `○`, `SKIP` → `─`, `MISSING`/`OLD` → `✗`.
+> **Windows / no-bash sessions:** if the Bash call is unavailable, perform the same checks with the tools you have (`Read`/`Glob` for file presence, your knowledge of `claude --version` / `node --version`) — the scan is informational and must not block. Mark anything you cannot determine as `OPTIONAL`.
 
-Print the results dashboard:
+Parse each `KEY=status|detail`. Map statuses to icons: `OK` → `✓`, `OPTIONAL` → `○`, `SKIP` → `─`, `MISSING`/`OLD` → `✗`. Print the results dashboard:
 
 ```text
   Results
   ──────────────────────────────────────────────────────────
-  Component              Detail
-  ──────────────────────────────────────────────────────────
   <icon>  Claude Code            <CC_DETAIL>
+  ✓  LLM backend            Claude Code session — no API key or local model needed
   <icon>  Agent Teams            <AT_DETAIL>
-  ──────────────────────────────────────────────────────────
   <icon>  Node.js                <NODE_DETAIL>
   <icon>  npm                    <NPM_DETAIL>
-  ──────────────────────────────────────────────────────────
   <icon>  Tier-1 indexer         <T1_DETAIL>
   <icon>  Tier-2 MCP server      <T2_DETAIL>
-  ──────────────────────────────────────────────────────────
+  <icon>  MCP wiring             <MCP_DETAIL>
   <icon>  Workspace layout       <WS_DETAIL>
   ──────────────────────────────────────────────────────────
-
   Legend:  ✓ ready   ○ optional   ─ skipped   ✗ action needed
-
-  Scan complete.
 ```
 
-If `WS_STATUS` is `MISSING`: stop and instruct the user to cd into their workspace root.
-
-For each item with status `OPTIONAL`, install silently in one Bash call per item, printing:
-
-- Before: `⟳ (2x/4) <name> → <action>…`
-- After: `✓ / ✗ / ○ (2x/4) <result>`
-
-Steps: (2a) Agent Teams settings file — (2b) Tier-1 indexer — (2c) Tier-2 MCP server.
-
-Print the summary then proceed to Step 4.
+**Only one hard blocker:** if `WS_STATUS` is `MISSING`, stop and tell the user to `cd` into their workspace root (the directory whose immediate subdirectories are the git repos). Everything else is optional and must not block.
 
 ---
 
-## Step 4 — Run /repo-orch-init
+## Step 2 — Show what setup will do (transparency)
+
+Before changing anything, state exactly what will be created or modified **in the workspace** — this is a propose-only tool, so the install earns trust rather than hiding:
+
+```text
+Setup will, given your environment:
+  • create / update  .claude/settings.json   — enable Agent Teams; wire the MCP server (if built)
+  • build optional tiers (indexer, MCP)       — only if Node 18+; any failure is non-fatal
+  • then run  /repo-orch-init                 — discover repos → write registry + per-repo context
+
+It will NOT modify any of your service repositories' code, and it never commits, pushes, or deletes.
+```
+
+---
+
+## Step 3 — Install optional components (non-blocking)
+
+For each `OPTIONAL` item, attempt it; **a failure is never fatal — report `✗ <item>: <reason>` and continue** (the Tier-0 path still works without it). Print a one-line before/after status per item.
+
+- **(3a) Agent Teams** — ensure `.claude/settings.json` has `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"` and `experimental.teammateMode = true`. Merge into existing JSON; never clobber other keys.
+- **(3b) Tier-1 indexer** — if Node 18+ and `T1_STATUS=OPTIONAL`: `cd .claude/plugins/repo-orchestrator/indexer && npm install && npm run build`.
+- **(3c) Tier-2 MCP server** — if Node 18+ and `T2_STATUS=OPTIONAL`: `cd .claude/plugins/repo-orchestrator/mcp && npm install && npm run build`.
+- **(3d) Wire MCP into settings.json** — if the MCP server is built (`mcp/dist/server.js` exists) and `MCP_STATUS != OK`, merge the block below into `.claude/settings.json` (preserve existing keys and other `mcpServers` entries; skip if `repo-orchestrator` is already present). **No manual JSON editing required** — this removes the old README step:
+
+```json
+{
+  "mcpServers": {
+    "repo-orchestrator": {
+      "command": "node",
+      "args": [".claude/plugins/repo-orchestrator/mcp/dist/server.js"]
+    }
+  }
+}
+```
+
+---
+
+## Step 4 — Restart gate (only when needed)
+
+Look at the scan's `AT_STATUS`:
+
+- **Already `OK`** → Agent Teams is active in this session. No restart needed — go straight to Step 5.
+- **Was `OPTIONAL` and you just enabled it in 3a** → the env var takes effect only after a restart. Do NOT auto-run init in this session. Print and stop:
+
+```text
+✓ Setup complete. Agent Teams was just enabled — restart Claude Code, then run:
+
+    /repo-orch-init
+
+(Multi-repo deliberation needs Agent Teams active. After restart, /repo-orch-init bootstraps your workspace.)
+```
+
+Similarly, if the MCP server was just wired in 3d, note that it loads on the next session start.
+
+---
+
+## Step 5 — Bootstrap
 
 Print:
 
 ```text
   ──────────────────────────────────────────────────────────────
-  [3/3]  Bootstrapping workspace…
+  Bootstrapping workspace…
   ──────────────────────────────────────────────────────────────
 ```
 
-Then invoke `/repo-orch-init` immediately — no confirmation gate.
+Then invoke `/repo-orch-init` immediately — the irreducible core that discovers repos and writes the registry + context. (Only reach this step when Agent Teams was already active, or when the user re-runs after restarting.)

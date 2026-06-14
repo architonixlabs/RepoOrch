@@ -1,5 +1,6 @@
 {
   "name": "repo-orchestrator",
+  "description": "Architonix marketplace — the repo-orchestrator plugin for coordinating multi-repo microservice workspaces as a propose-only AI agent team.",
   "owner": {
     "name": "Architonix",
     "url": "https://github.com/architonixlabs"
